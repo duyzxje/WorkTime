@@ -21,6 +21,11 @@ app.get('/', (req, res) => {
     res.send('WorkTime API is running');
 });
 
+// Health check route for Render
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
