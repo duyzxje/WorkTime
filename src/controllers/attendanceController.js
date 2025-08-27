@@ -68,26 +68,41 @@ const checkIn = async (req, res) => {
             office.radius
         );
 
-        // Không trả về lỗi, thay vào đó ghi lại thông tin và đánh dấu là không hợp lệ
-        // Thông báo cho người dùng trong response  
+        // Kiểm tra vị trí GPS
+        if (!isValid) {
+            // Nếu vị trí không hợp lệ thì không lưu vào database
+            return res.status(400).json({
+                message: 'Vị trí check-in không hợp lệ. Bạn cần ở trong phạm vi văn phòng để check-in.',
+                isValid: false,
+                userCoordinates: userCoordinates,
+                officeCoordinates: office.coordinates,
+                officeRadius: office.radius
+            });
+        }
 
-        // Create attendance record
+        // Điều chỉnh giờ cho múi giờ Việt Nam (+7)
+        const nowUtc = new Date();
+        const vietnamTime = new Date(nowUtc.getTime() + (7 * 60 * 60 * 1000)); // Thêm 7 giờ
+        console.log('Current UTC time:', nowUtc);
+        console.log('Vietnam time (+7):', vietnamTime);
+
+        // Chỉ lưu vào DB khi vị trí hợp lệ
         const attendance = await Attendance.create({
             user: userId,
-            checkInTime: new Date(),
+            checkInTime: vietnamTime,
             checkInLocation: {
                 type: 'Point',
                 coordinates: userCoordinates,
             },
-            isValid: isValid, // Lưu trạng thái hợp lệ dựa trên vị trí
+            isValid: true, // Luôn true vì chỉ lưu khi hợp lệ
             officeId: officeId,
             notes,
         });
 
         res.status(201).json({
-            message: isValid ? 'Check-in thành công' : 'Vị trí check-in không hợp lệ. Dữ liệu đã được ghi lại nhưng sẽ được đánh dấu là không hợp lệ.',
+            message: 'Check-in thành công',
             attendance,
-            isValid: isValid,
+            isValid: true,
         });
     } catch (error) {
         console.error(error);
@@ -160,18 +175,34 @@ const checkOut = async (req, res) => {
             office.radius
         );
 
+        // Nếu vị trí không hợp lệ thì không cho phép check-out
+        if (!isValid) {
+            return res.status(400).json({
+                message: 'Vị trí check-out không hợp lệ. Bạn cần ở trong phạm vi văn phòng để check-out.',
+                isValid: false,
+                userCoordinates: userCoordinates,
+                officeCoordinates: office.coordinates,
+                officeRadius: office.radius
+            });
+        }
+
+        // Điều chỉnh giờ cho múi giờ Việt Nam (+7)
+        const nowUtc = new Date();
+        const vietnamTime = new Date(nowUtc.getTime() + (7 * 60 * 60 * 1000)); // Thêm 7 giờ
+        console.log('Current UTC time (checkout):', nowUtc);
+        console.log('Vietnam time (+7) (checkout):', vietnamTime);
+
         // Tính thời gian làm việc (phút)
         const checkInTime = new Date(attendance.checkInTime);
-        const checkOutTime = new Date();
+        const checkOutTime = vietnamTime;
         const workDurationMinutes = Math.round((checkOutTime - checkInTime) / (1000 * 60));
 
+        // Cập nhật thông tin check-out
         attendance.checkOutTime = checkOutTime;
         attendance.checkOutLocation.coordinates = userCoordinates;
         attendance.status = 'checked-out';
         attendance.workDuration = workDurationMinutes;
-        // Nếu check-in đã không hợp lệ thì giữ nguyên trạng thái không hợp lệ
-        // Nếu không, cập nhật theo kết quả kiểm tra vị trí check-out
-        attendance.isValid = attendance.isValid === false ? false : isValid;
+        attendance.isValid = true; // Luôn true vì chỉ lưu khi hợp lệ
 
         if (notes) {
             attendance.notes = attendance.notes
@@ -187,9 +218,9 @@ const checkOut = async (req, res) => {
         const workTimeFormatted = `${hours}h${minutes}m`;
 
         res.json({
-            message: isValid ? 'Check-out thành công' : 'Vị trí check-out không hợp lệ. Dữ liệu đã được ghi lại nhưng sẽ được đánh dấu là không hợp lệ.',
+            message: 'Check-out thành công',
             attendance,
-            isValid: isValid,
+            isValid: true,
             workDuration: workDurationMinutes,
             workTimeFormatted: workTimeFormatted
         });
@@ -245,17 +276,26 @@ const getAttendanceHistory = async (req, res) => {
                 attendance.workTimeFormatted = `${hours}h${minutes}m`;
             }
 
-            // Định dạng thời gian check-in/check-out thân thiện
+            // Định dạng thời gian check-in/check-out thân thiện (đã được lưu theo múi giờ VN)
             if (attendance.checkInTime) {
-                attendance.checkInTimeFormatted = new Date(attendance.checkInTime)
-                    .toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-                attendance.checkInDateFormatted = new Date(attendance.checkInTime)
-                    .toLocaleDateString('vi-VN');
+                const checkInDate = new Date(attendance.checkInTime);
+                attendance.checkInTimeFormatted = checkInDate.toLocaleTimeString('vi-VN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'Asia/Ho_Chi_Minh'
+                });
+                attendance.checkInDateFormatted = checkInDate.toLocaleDateString('vi-VN', {
+                    timeZone: 'Asia/Ho_Chi_Minh'
+                });
             }
 
             if (attendance.checkOutTime) {
-                attendance.checkOutTimeFormatted = new Date(attendance.checkOutTime)
-                    .toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                const checkOutDate = new Date(attendance.checkOutTime);
+                attendance.checkOutTimeFormatted = checkOutDate.toLocaleTimeString('vi-VN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'Asia/Ho_Chi_Minh'
+                });
             }
 
             return attendance;
