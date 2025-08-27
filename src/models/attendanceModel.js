@@ -42,6 +42,18 @@ const attendanceSchema = mongoose.Schema(
             enum: ['checked-in', 'checked-out'],
             default: 'checked-in',
         },
+        isValid: {
+            type: Boolean,
+            default: true,
+        },
+        officeId: {
+            type: String,
+            default: 'main',
+        },
+        workDuration: {
+            type: Number, // Thời gian làm việc tính bằng phút
+            default: 0,
+        },
         notes: {
             type: String,
         },
