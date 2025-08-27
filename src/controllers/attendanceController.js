@@ -216,12 +216,15 @@ const getAttendanceHistory = async (req, res) => {
 
         const query = { user: userId };
 
-        // Add date range if provided
+        // Add date range ONLY if BOTH startDate AND endDate are provided
         if (startDate && endDate) {
+            console.log(`Filtering by date range: ${startDate} to ${endDate}`);
             query.checkInTime = {
                 $gte: new Date(startDate),
                 $lte: new Date(endDate),
             };
+        } else {
+            console.log('No date filters applied - returning all records');
         }
 
         console.log('Database query:', JSON.stringify(query)); // Debug
