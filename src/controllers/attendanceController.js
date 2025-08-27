@@ -221,9 +221,41 @@ const getAttendanceHistory = async (req, res) => {
             };
         }
 
-        const attendance = await Attendance.find(query).sort('-checkInTime');
+        // Lấy dữ liệu chấm công
+        const attendanceRecords = await Attendance.find(query).sort('-checkInTime');
 
-        res.json(attendance);
+        // Tính toán thông tin bổ sung cho mỗi bản ghi
+        const enrichedAttendance = attendanceRecords.map(record => {
+            const attendance = record.toObject();
+
+            // Tính thời gian làm việc theo format giờ:phút nếu có check-out
+            if (attendance.status === 'checked-out' && attendance.workDuration) {
+                const hours = Math.floor(attendance.workDuration / 60);
+                const minutes = attendance.workDuration % 60;
+                attendance.workTimeFormatted = `${hours}h${minutes}m`;
+            }
+
+            // Định dạng thời gian check-in/check-out thân thiện
+            if (attendance.checkInTime) {
+                attendance.checkInTimeFormatted = new Date(attendance.checkInTime)
+                    .toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                attendance.checkInDateFormatted = new Date(attendance.checkInTime)
+                    .toLocaleDateString('vi-VN');
+            }
+
+            if (attendance.checkOutTime) {
+                attendance.checkOutTimeFormatted = new Date(attendance.checkOutTime)
+                    .toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            }
+
+            return attendance;
+        });
+
+        res.json({
+            userId,
+            count: enrichedAttendance.length,
+            attendance: enrichedAttendance
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server Error' });
