@@ -6,8 +6,8 @@
 const officeLocations = {
     main: {
         name: 'Main Office',
-        coordinates: [106.667976, 10.846469], // [longitude, latitude]
-        radius: 50, // Bán kính 50m
+        coordinates: [Number(106.667976), Number(10.846469)], // [longitude, latitude] đảm bảo là số
+        radius: Number(50), // Bán kính 50m
     },
     // Có thể thêm các vị trí văn phòng khác ở đây
 };

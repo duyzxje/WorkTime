@@ -207,6 +207,9 @@ const getAttendanceHistory = async (req, res) => {
         const { userId } = req.params;
         const { startDate, endDate } = req.query;
 
+        console.log('Request params:', req.params); // Debug
+        console.log('User ID:', userId); // Debug
+
         if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
             return res.status(400).json({ message: 'Valid user ID is required' });
         }
@@ -221,8 +224,12 @@ const getAttendanceHistory = async (req, res) => {
             };
         }
 
+        console.log('Database query:', JSON.stringify(query)); // Debug
+
         // Lấy dữ liệu chấm công
         const attendanceRecords = await Attendance.find(query).sort('-checkInTime');
+
+        console.log(`Found ${attendanceRecords.length} records`); // Debug
 
         // Tính toán thông tin bổ sung cho mỗi bản ghi
         const enrichedAttendance = attendanceRecords.map(record => {
@@ -251,14 +258,18 @@ const getAttendanceHistory = async (req, res) => {
             return attendance;
         });
 
-        res.json({
+        const result = {
             userId,
             count: enrichedAttendance.length,
             attendance: enrichedAttendance
-        });
+        };
+
+        console.log('Sending response:', JSON.stringify(result).substring(0, 200) + '...'); // Debug
+
+        res.json(result);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+        console.error('Error in getAttendanceHistory:', error);
+        res.status(500).json({ message: 'Server Error: ' + error.message });
     }
 };
 

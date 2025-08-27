@@ -23,6 +23,7 @@ router.post('/manual-checkout', manualCheckOut);
 // Create manual attendance record (admin only)
 router.post('/manual-record', protect, admin, createManualRecord);
 
+// QUAN TRỌNG: Route cụ thể phải đặt TRƯỚC route có tham số
 // Get attendance for all users (vẫn giữ lại bảo vệ admin)
 router.get('/all', protect, admin, getAllAttendance);
 
