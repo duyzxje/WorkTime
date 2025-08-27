@@ -18,7 +18,7 @@ const officeSchema = mongoose.Schema(
                 default: 'Point',
             },
             coordinates: {
-                type: [Number], // [longitude, latitude]
+                type: [String], // [longitude, latitude]
                 required: true,
             },
         },
