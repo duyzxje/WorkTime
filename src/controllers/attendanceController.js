@@ -19,12 +19,20 @@ const checkIn = async (req, res) => {
             return res.status(400).json({ message: 'GPS coordinates are required' });
         }
 
-        // Check if user already has an active check-in for today
-        const startOfDay = new Date();
+        // Check if user already has an active check-in for today (sử dụng múi giờ Việt Nam)
+        const nowUtc = new Date();
+        const vietnamTime = new Date(nowUtc.getTime() + (7 * 60 * 60 * 1000)); // Thêm 7 giờ
+
+        // Tính đầu ngày và cuối ngày theo múi giờ Việt Nam
+        const startOfDay = new Date(vietnamTime);
         startOfDay.setHours(0, 0, 0, 0);
 
-        const endOfDay = new Date();
+        const endOfDay = new Date(vietnamTime);
         endOfDay.setHours(23, 59, 59, 999);
+
+        console.log('Vietnam time for check-in search:', vietnamTime);
+        console.log('Start of day (VN):', startOfDay);
+        console.log('End of day (VN):', endOfDay);
 
         const existingAttendance = await Attendance.findOne({
             user: userId,
@@ -81,15 +89,15 @@ const checkIn = async (req, res) => {
         }
 
         // Điều chỉnh giờ cho múi giờ Việt Nam (+7)
-        const nowUtc = new Date();
-        const vietnamTime = new Date(nowUtc.getTime() + (7 * 60 * 60 * 1000)); // Thêm 7 giờ
-        console.log('Current UTC time:', nowUtc);
-        console.log('Vietnam time (+7):', vietnamTime);
+        const checkInTimeUtc = new Date();
+        const checkInTimeVietnam = new Date(checkInTimeUtc.getTime() + (7 * 60 * 60 * 1000)); // Thêm 7 giờ
+        console.log('Current UTC time:', checkInTimeUtc);
+        console.log('Vietnam time (+7):', checkInTimeVietnam);
 
         // Chỉ lưu vào DB khi vị trí hợp lệ
         const attendance = await Attendance.create({
             user: userId,
-            checkInTime: vietnamTime,
+            checkInTime: checkInTimeVietnam,
             checkInLocation: {
                 type: 'Point',
                 coordinates: userCoordinates,
@@ -125,12 +133,20 @@ const checkOut = async (req, res) => {
             return res.status(400).json({ message: 'GPS coordinates are required' });
         }
 
-        // Find active check-in for today
-        const startOfDay = new Date();
+        // Find active check-in for today (sử dụng múi giờ Việt Nam)
+        const nowUtc = new Date();
+        const vietnamTime = new Date(nowUtc.getTime() + (7 * 60 * 60 * 1000)); // Thêm 7 giờ
+
+        // Tính đầu ngày và cuối ngày theo múi giờ Việt Nam
+        const startOfDay = new Date(vietnamTime);
         startOfDay.setHours(0, 0, 0, 0);
 
-        const endOfDay = new Date();
+        const endOfDay = new Date(vietnamTime);
         endOfDay.setHours(23, 59, 59, 999);
+
+        console.log('Vietnam time for search:', vietnamTime);
+        console.log('Start of day (VN):', startOfDay);
+        console.log('End of day (VN):', endOfDay);
 
         const attendance = await Attendance.findOne({
             user: userId,
@@ -187,14 +203,14 @@ const checkOut = async (req, res) => {
         }
 
         // Điều chỉnh giờ cho múi giờ Việt Nam (+7)
-        const nowUtc = new Date();
-        const vietnamTime = new Date(nowUtc.getTime() + (7 * 60 * 60 * 1000)); // Thêm 7 giờ
-        console.log('Current UTC time (checkout):', nowUtc);
-        console.log('Vietnam time (+7) (checkout):', vietnamTime);
+        const checkOutTimeUtc = new Date();
+        const checkOutTimeVietnam = new Date(checkOutTimeUtc.getTime() + (7 * 60 * 60 * 1000)); // Thêm 7 giờ
+        console.log('Current UTC time (checkout):', checkOutTimeUtc);
+        console.log('Vietnam time (+7) (checkout):', checkOutTimeVietnam);
 
         // Tính thời gian làm việc (phút)
         const checkInTime = new Date(attendance.checkInTime);
-        const checkOutTime = vietnamTime;
+        const checkOutTime = checkOutTimeVietnam;
         const workDurationMinutes = Math.round((checkOutTime - checkInTime) / (1000 * 60));
 
         // Cập nhật thông tin check-out
