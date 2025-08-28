@@ -5,7 +5,8 @@ const {
     getAttendanceHistory,
     getAllAttendance,
     manualCheckOut,
-    createManualRecord
+    createManualRecord,
+    getAttendanceSummary
 } = require('../controllers/attendanceController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
@@ -26,6 +27,9 @@ router.post('/manual-record', protect, admin, createManualRecord);
 // QUAN TRỌNG: Route cụ thể phải đặt TRƯỚC route có tham số
 // Get attendance for all users (vẫn giữ lại bảo vệ admin)
 router.get('/all', protect, admin, getAllAttendance);
+
+// Get attendance summary by month for a user
+router.get('/:userId/summary', getAttendanceSummary);
 
 // Get user's attendance history - theo userId (PHẢI ĐỂ Ở CUỐI CÙNG!)
 router.get('/:userId', getAttendanceHistory);

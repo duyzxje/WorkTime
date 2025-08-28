@@ -580,11 +580,198 @@ const createManualRecord = async (req, res) => {
     }
 };
 
+// @desc    Get attendance summary by month for a user
+// @route   GET /api/attendance/:userId/summary
+// @access  Public
+const getAttendanceSummary = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { month, year } = req.query;
+
+        console.log(`Generating attendance summary for userId: ${userId}, month: ${month}, year: ${year}`);
+
+        if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ message: 'Valid user ID is required' });
+        }
+
+        if (!month || !year) {
+            return res.status(400).json({ message: 'Month and year are required' });
+        }
+
+        // Validate month and year
+        const monthNum = parseInt(month);
+        const yearNum = parseInt(year);
+
+        if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+            return res.status(400).json({ message: 'Invalid month. Month must be between 1 and 12.' });
+        }
+
+        if (isNaN(yearNum)) {
+            return res.status(400).json({ message: 'Invalid year format.' });
+        }
+
+        // Tính ngày đầu và cuối của tháng (UTC+7 Vietnam timezone)
+        const startOfMonth = new Date(Date.UTC(yearNum, monthNum - 1, 1, -7, 0, 0)); // -7 hours to get Vietnam timezone
+        const endOfMonth = new Date(Date.UTC(yearNum, monthNum, 0, 16, 59, 59)); // Last day of month at 23:59:59 Vietnam time
+
+        console.log(`Start of month: ${startOfMonth.toISOString()}`);
+        console.log(`End of month: ${endOfMonth.toISOString()}`);
+
+        // Lấy tất cả các bản ghi chấm công trong tháng
+        const attendanceRecords = await Attendance.find({
+            user: userId,
+            checkInTime: {
+                $gte: startOfMonth,
+                $lte: endOfMonth,
+            }
+        }).sort('checkInTime');
+
+        // Tính toán thống kê
+        let totalDaysWorked = 0;
+        let totalWorkMinutes = 0;
+        let earliestCheckIn = null;
+        let latestCheckOut = null;
+        let incompleteRecords = 0; // Số lần không checkout
+
+        // Phân tích thông tin từng ngày trong tháng
+        const dailyRecords = [];
+
+        // Tạo bảng dữ liệu cho từng ngày trong tháng
+        const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const currentDate = new Date(Date.UTC(yearNum, monthNum - 1, day, -7, 0, 0));
+            const nextDate = new Date(Date.UTC(yearNum, monthNum - 1, day, 16, 59, 59));
+
+            // Tìm các bản ghi trong ngày này
+            const dayRecords = attendanceRecords.filter(record => {
+                const recordDate = new Date(record.checkInTime);
+                return recordDate >= currentDate && recordDate <= nextDate;
+            });
+
+            if (dayRecords.length > 0) {
+                totalDaysWorked++;
+
+                // Thông tin chi tiết của ngày
+                const dayData = {
+                    date: currentDate.toISOString().split('T')[0],
+                    dayOfWeek: currentDate.getDay(), // 0 = Chủ nhật, 1 = Thứ hai, ...
+                    records: dayRecords.map(record => {
+                        const recordObj = record.toObject();
+
+                        // Định dạng giờ check-in/check-out
+                        if (recordObj.checkInTime) {
+                            recordObj.checkInTimeFormatted = new Date(recordObj.checkInTime)
+                                .toLocaleTimeString('vi-VN', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    timeZone: 'Asia/Ho_Chi_Minh'
+                                });
+                        }
+
+                        if (recordObj.checkOutTime) {
+                            recordObj.checkOutTimeFormatted = new Date(recordObj.checkOutTime)
+                                .toLocaleTimeString('vi-VN', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    timeZone: 'Asia/Ho_Chi_Minh'
+                                });
+
+                            // Cập nhật thời gian làm việc
+                            if (recordObj.workDuration) {
+                                totalWorkMinutes += recordObj.workDuration;
+
+                                // Format thời gian làm việc
+                                const hours = Math.floor(recordObj.workDuration / 60);
+                                const minutes = recordObj.workDuration % 60;
+                                recordObj.workTimeFormatted = `${hours}h${minutes}m`;
+                            }
+                        } else {
+                            // Nếu không có check-out
+                            incompleteRecords++;
+                        }
+
+                        // Theo dõi thời gian check-in sớm nhất và check-out muộn nhất
+                        if (!earliestCheckIn || new Date(recordObj.checkInTime) < new Date(earliestCheckIn)) {
+                            earliestCheckIn = recordObj.checkInTime;
+                        }
+
+                        if (recordObj.checkOutTime && (!latestCheckOut || new Date(recordObj.checkOutTime) > new Date(latestCheckOut))) {
+                            latestCheckOut = recordObj.checkOutTime;
+                        }
+
+                        return {
+                            id: recordObj._id,
+                            checkInTime: recordObj.checkInTime,
+                            checkInTimeFormatted: recordObj.checkInTimeFormatted,
+                            checkOutTime: recordObj.checkOutTime,
+                            checkOutTimeFormatted: recordObj.checkOutTimeFormatted || 'Chưa check-out',
+                            status: recordObj.status,
+                            workDuration: recordObj.workDuration || 0,
+                            workTimeFormatted: recordObj.workTimeFormatted || '0h0m',
+                            notes: recordObj.notes || ''
+                        };
+                    })
+                };
+
+                dailyRecords.push(dayData);
+            }
+        }
+
+        // Tính tổng thời gian làm việc
+        const totalHours = Math.floor(totalWorkMinutes / 60);
+        const totalMinutes = totalWorkMinutes % 60;
+
+        // Tạo kết quả thống kê
+        const summary = {
+            userId,
+            month: monthNum,
+            year: yearNum,
+            totalDaysWorked,
+            totalWorkDuration: {
+                minutes: totalWorkMinutes,
+                formatted: `${totalHours}h${totalMinutes}m`
+            },
+            averageWorkDurationPerDay: totalDaysWorked > 0 ? {
+                minutes: Math.round(totalWorkMinutes / totalDaysWorked),
+                formatted: `${Math.floor(totalWorkMinutes / totalDaysWorked / 60)}h${totalWorkMinutes / totalDaysWorked % 60}m`
+            } : {
+                minutes: 0,
+                formatted: '0h0m'
+            },
+            earliestCheckIn: earliestCheckIn ? {
+                time: earliestCheckIn,
+                formatted: new Date(earliestCheckIn).toLocaleTimeString('vi-VN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'Asia/Ho_Chi_Minh'
+                })
+            } : null,
+            latestCheckOut: latestCheckOut ? {
+                time: latestCheckOut,
+                formatted: new Date(latestCheckOut).toLocaleTimeString('vi-VN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'Asia/Ho_Chi_Minh'
+                })
+            } : null,
+            incompleteRecords,
+            dailyRecords
+        };
+
+        res.json(summary);
+    } catch (error) {
+        console.error('Error in getAttendanceSummary:', error);
+        res.status(500).json({ message: 'Server Error: ' + error.message });
+    }
+};
+
 module.exports = {
     checkIn,
     checkOut,
     getAttendanceHistory,
     getAllAttendance,
     manualCheckOut,
-    createManualRecord
+    createManualRecord,
+    getAttendanceSummary
 };
