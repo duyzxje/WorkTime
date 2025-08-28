@@ -642,6 +642,21 @@ const getAttendanceSummary = async (req, res) => {
         // Tạo bảng dữ liệu cho từng ngày trong tháng
         const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
 
+        // Set để theo dõi các ngày đã có bản ghi (theo ngày trong tháng)
+        const uniqueDays = new Set();
+
+        // Trước tiên đánh dấu tất cả các ngày có bản ghi
+        attendanceRecords.forEach(record => {
+            const recordDate = new Date(record.checkInTime);
+            const dayOfMonth = recordDate.getDate(); // Lấy ngày trong tháng (1-31)
+            uniqueDays.add(dayOfMonth);
+        });
+
+        console.log('Unique days with records:', Array.from(uniqueDays).sort((a, b) => a - b).join(', '));
+
+        // Cập nhật totalDaysWorked từ số lượng ngày duy nhất
+        totalDaysWorked = uniqueDays.size;
+
         for (let day = 1; day <= daysInMonth; day++) {
             const currentDate = new Date(Date.UTC(yearNum, monthNum - 1, day, -7, 0, 0));
             const nextDate = new Date(Date.UTC(yearNum, monthNum - 1, day, 16, 59, 59));
@@ -653,7 +668,7 @@ const getAttendanceSummary = async (req, res) => {
             });
 
             if (dayRecords.length > 0) {
-                totalDaysWorked++;
+                // Không tăng totalDaysWorked ở đây vì đã tính ở trên
 
                 // Thông tin chi tiết của ngày
                 const dayData = {
