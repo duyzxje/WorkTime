@@ -252,9 +252,10 @@ const checkOut = async (req, res) => {
 const getAttendanceHistory = async (req, res) => {
     try {
         const { userId } = req.params;
-        const { startDate, endDate } = req.query;
+        const { startDate, endDate, month, year } = req.query;
 
         console.log('Request params:', req.params); // Debug
+        console.log('Request query:', req.query); // Debug
         console.log('User ID:', userId); // Debug
 
         if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
@@ -263,8 +264,35 @@ const getAttendanceHistory = async (req, res) => {
 
         const query = { user: userId };
 
-        // Add date range ONLY if BOTH startDate AND endDate are provided
-        if (startDate && endDate) {
+        // Xử lý lọc theo tháng và năm nếu được cung cấp
+        if (month && year) {
+            console.log(`Filtering by month/year: ${month}/${year}`);
+            const monthNum = parseInt(month);
+            const yearNum = parseInt(year);
+
+            // Validate month and year
+            if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+                return res.status(400).json({ message: 'Invalid month. Month must be between 1 and 12.' });
+            }
+
+            if (isNaN(yearNum)) {
+                return res.status(400).json({ message: 'Invalid year format.' });
+            }
+
+            // Tính ngày đầu và cuối của tháng (UTC+7 Vietnam timezone)
+            const startOfMonth = new Date(Date.UTC(yearNum, monthNum - 1, 1, -7, 0, 0)); // -7 hours to get Vietnam timezone
+            const endOfMonth = new Date(Date.UTC(yearNum, monthNum, 0, 16, 59, 59)); // Last day of month at 23:59:59 Vietnam time
+
+            console.log(`Start of month: ${startOfMonth.toISOString()}`);
+            console.log(`End of month: ${endOfMonth.toISOString()}`);
+
+            query.checkInTime = {
+                $gte: startOfMonth,
+                $lte: endOfMonth,
+            };
+        }
+        // Nếu không có month/year nhưng có startDate và endDate
+        else if (startDate && endDate) {
             console.log(`Filtering by date range: ${startDate} to ${endDate}`);
             query.checkInTime = {
                 $gte: new Date(startDate),
@@ -337,7 +365,7 @@ const getAttendanceHistory = async (req, res) => {
 // @access  Private/Admin
 const getAllAttendance = async (req, res) => {
     try {
-        const { startDate, endDate, userId } = req.query;
+        const { startDate, endDate, userId, month, year } = req.query;
 
         const query = {};
 
@@ -346,8 +374,35 @@ const getAllAttendance = async (req, res) => {
             query.user = userId;
         }
 
+        // Xử lý lọc theo tháng và năm nếu được cung cấp
+        if (month && year) {
+            console.log(`Admin filtering by month/year: ${month}/${year}`);
+            const monthNum = parseInt(month);
+            const yearNum = parseInt(year);
+
+            // Validate month and year
+            if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+                return res.status(400).json({ message: 'Invalid month. Month must be between 1 and 12.' });
+            }
+
+            if (isNaN(yearNum)) {
+                return res.status(400).json({ message: 'Invalid year format.' });
+            }
+
+            // Tính ngày đầu và cuối của tháng (UTC+7 Vietnam timezone)
+            const startOfMonth = new Date(Date.UTC(yearNum, monthNum - 1, 1, -7, 0, 0)); // -7 hours to get Vietnam timezone
+            const endOfMonth = new Date(Date.UTC(yearNum, monthNum, 0, 16, 59, 59)); // Last day of month at 23:59:59 Vietnam time
+
+            console.log(`Start of month: ${startOfMonth.toISOString()}`);
+            console.log(`End of month: ${endOfMonth.toISOString()}`);
+
+            query.checkInTime = {
+                $gte: startOfMonth,
+                $lte: endOfMonth,
+            };
+        }
         // Add date range if provided
-        if (startDate && endDate) {
+        else if (startDate && endDate) {
             query.checkInTime = {
                 $gte: new Date(startDate),
                 $lte: new Date(endDate),
