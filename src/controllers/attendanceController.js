@@ -212,8 +212,8 @@ const checkOut = async (req, res) => {
         console.log('Vietnam time (+7) (checkout):', checkOutTimeVietnam);
 
         // Tính thời gian làm việc (phút)
-        const checkInTime = new Date(attendance.checkInTime);
         const checkOutTime = checkOutTimeVietnam;
+        // Reuse checkInTime từ biến đã khai báo ở trên
         const workDurationMinutes = Math.round((checkOutTime - checkInTime) / (1000 * 60));
 
         // Cập nhật thông tin check-out
