@@ -133,29 +133,32 @@ const checkOut = async (req, res) => {
             return res.status(400).json({ message: 'GPS coordinates are required' });
         }
 
-        // Find active check-in for today (sử dụng múi giờ Việt Nam)
+        // Thời gian hiện tại theo múi giờ Việt Nam
         const nowUtc = new Date();
         const vietnamTime = new Date(nowUtc.getTime() + (7 * 60 * 60 * 1000)); // Thêm 7 giờ
 
-        // Tính đầu ngày và cuối ngày theo múi giờ Việt Nam
-        const startOfDay = new Date(vietnamTime);
-        startOfDay.setHours(0, 0, 0, 0);
+        console.log('Vietnam time for checkout:', vietnamTime);
 
-        const endOfDay = new Date(vietnamTime);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        console.log('Vietnam time for search:', vietnamTime);
-        console.log('Start of day (VN):', startOfDay);
-        console.log('End of day (VN):', endOfDay);
-
+        // Tìm kiếm ca làm việc đang mở (chưa checkout) gần nhất của user
+        // Không giới hạn ngày - hỗ trợ làm việc qua đêm/qua ngày
         const attendance = await Attendance.findOne({
             user: userId,
-            checkInTime: { $gte: startOfDay, $lte: endOfDay },
             status: 'checked-in',
-        });
+        }).sort({ checkInTime: -1 }); // Lấy check-in gần đây nhất
 
         if (!attendance) {
-            return res.status(404).json({ message: 'No active check-in found for today' });
+            return res.status(404).json({ message: 'Không tìm thấy ca làm việc đang mở nào. Vui lòng check-in trước.' });
+        }
+
+        // Kiểm tra xem có phải ca làm việc quá 24h hay không 
+        const checkInTime = new Date(attendance.checkInTime);
+        const hoursDiff = (vietnamTime - checkInTime) / (1000 * 60 * 60);
+
+        console.log(`Hours between check-in and check-out: ${hoursDiff}`);
+
+        if (hoursDiff > 24) {
+            console.log('Warning: Shift duration exceeds 24 hours');
+            // Vẫn cho phép checkout nhưng ghi log cảnh báo
         }
 
         // Update the attendance record with check-out
