@@ -19,17 +19,23 @@ const protect = async (req, res, next) => {
             req.user = await User.findById(decoded.id).select('-password');
 
             next();
+            return; // Exit after calling next
         } catch (error) {
             console.error(error);
             res.status(401);
-            res.json({ message: 'Not authorized, token failed' });
+            return res.json({
+                success: false,
+                message: 'Not authorized, token failed'
+            });
         }
     }
 
-    if (!token) {
-        res.status(401);
-        res.json({ message: 'Not authorized, no token' });
-    }
+    // If we get here, no token was present
+    res.status(401);
+    return res.json({
+        success: false,
+        message: 'Not authorized, no token'
+    });
 };
 
 // Admin middleware
@@ -38,7 +44,10 @@ const admin = (req, res, next) => {
         next();
     } else {
         res.status(401);
-        res.json({ message: 'Not authorized as an admin' });
+        return res.json({
+            success: false,
+            message: 'Not authorized as an admin'
+        });
     }
 };
 
