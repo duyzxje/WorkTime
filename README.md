@@ -10,6 +10,9 @@ Backend service for employee attendance tracking with GPS validation.
 - Generate daily and monthly attendance reports
 - Manual check-out for forgotten check-outs
 - Admin features for managing office locations
+- Work shift registration system (morning, noon, afternoon, evening, off)
+- Live event schedule management
+- User management with role-based access control
 
 ## Tech Stack
 
@@ -61,7 +64,58 @@ Backend service for employee attendance tracking with GPS validation.
 - `GET /api/reports/monthly/:userId` - Get monthly attendance report
   - Optional query params: `year`
 
+### Shifts
+
+- `GET /api/shifts` - Get all shift registrations for the week
+  - Required query params: `weekStartDate` (YYYY-MM-DD)
+
+- `GET /api/shifts/user/:userId` - Get shifts for a specific user
+  - Required query params: `weekStartDate` (YYYY-MM-DD)
+
+- `POST /api/shifts/toggle` - Toggle shift registration (register/unregister)
+  - Required body: `{ userId, day, shiftType, weekStartDate }`
+  - Where:
+    - `day`: number (1-7)
+    - `shiftType`: string ("morning", "noon", "afternoon", "evening")
+    - `weekStartDate`: string (YYYY-MM-DD)
+
+### Live Events
+
+- `GET /api/live` - Get live events schedule for the week
+  - Required query params: `weekStartDate` (YYYY-MM-DD)
+
+- `POST /api/live/update` - Update live event for a day (admin only)
+  - Required body: `{ day, shiftType, weekStartDate }`
+  - Where:
+    - `day`: number (1-7)
+    - `shiftType`: string ("morning", "noon", "afternoon", "evening", "off")
+    - `weekStartDate`: string (YYYY-MM-DD)
+
+### Users
+
+- `GET /api/users` - Get all users (admin only)
+
+- `POST /api/users` - Create a new user (admin only)
+  - Required body: `{ username, name, password, email }`
+  - Optional body: `{ role }` ("admin", "staff", "viewer")
+
+- `PUT /api/users/:userId` - Update user (admin only)
+  - Optional body: `{ name, role, email, password }`
+
+- `DELETE /api/users/:userId` - Delete user (admin only)
+
+- `GET /api/users/profile` - Get current user profile
+
+### Authentication
+
+- `POST /api/auth/login` - Authenticate user & get token
+  - Required body: `{ username, password }`
+
+- `GET /api/auth/verify` - Verify token and get user data
+
 ## Cách hoạt động
+
+### Chấm công
 
 1. Frontend xử lý đăng nhập trực tiếp với database
 2. Sau khi đăng nhập thành công, frontend sẽ gửi thông tin check-in/check-out kèm userId và tọa độ GPS
@@ -69,6 +123,19 @@ Backend service for employee attendance tracking with GPS validation.
 4. Backend lưu dữ liệu chấm công và trả kết quả thành công hoặc thất bại
    - Nếu vị trí không hợp lệ, dữ liệu vẫn được lưu nhưng được đánh dấu là không hợp lệ
 5. Frontend hiển thị lịch sử chấm công dựa theo userId
+
+### Đăng ký ca làm việc
+
+1. Người dùng có thể xem lịch đăng ký ca làm việc theo tuần
+2. Người dùng có thể đăng ký nhiều ca làm việc trong cùng một ngày (sáng, trưa, chiều, tối)
+3. Khi người dùng đăng ký hoặc hủy đăng ký ca làm việc, hệ thống sẽ cập nhật trạng thái ca làm việc
+4. Quản trị viên có thể xem đăng ký ca làm việc của tất cả người dùng
+
+### Lịch Live
+
+1. Quản trị viên có thể cập nhật lịch Live cho từng ngày trong tuần
+2. Mỗi ngày có thể có một trạng thái Live: sáng, trưa, chiều, tối hoặc off
+3. Người dùng có thể xem lịch Live của toàn bộ tuần
 
 ## Khởi tạo dữ liệu văn phòng
 
@@ -134,3 +201,24 @@ Các bước triển khai lên Render:
 - `radius`: Number (mét)
 - `address`: String
 - `isActive`: Boolean
+
+### User
+- `username`: String
+- `name`: String
+- `email`: String
+- `password`: String (hashed)
+- `role`: String (admin, staff, viewer)
+
+### Shift
+- `userId`: ObjectId (tham chiếu đến User)
+- `weekStartDate`: Date
+- `day`: Number (1-7)
+- `morning`: Boolean
+- `noon`: Boolean
+- `afternoon`: Boolean
+- `evening`: Boolean
+
+### Live
+- `weekStartDate`: Date
+- `day`: Number (1-7)
+- `shiftType`: String (morning, noon, afternoon, evening, off)

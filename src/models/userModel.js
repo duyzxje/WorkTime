@@ -7,6 +7,11 @@ const userSchema = mongoose.Schema(
             type: String,
             required: [true, 'Please add a name'],
         },
+        username: {
+            type: String,
+            required: [true, 'Please add a username'],
+            unique: true,
+        },
         email: {
             type: String,
             required: [true, 'Please add an email'],
@@ -23,8 +28,8 @@ const userSchema = mongoose.Schema(
         },
         role: {
             type: String,
-            enum: ['employee', 'admin'],
-            default: 'employee',
+            enum: ['admin', 'staff', 'viewer'],
+            default: 'staff',
         },
     },
     {
@@ -38,7 +43,7 @@ userSchema.pre('save', async function (next) {
         next();
     }
 
-    const salt = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
 });
 

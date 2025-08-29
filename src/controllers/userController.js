@@ -6,35 +6,50 @@ const generateToken = require('../utils/generateToken');
 // @access  Public
 const registerUser = async (req, res) => {
     try {
-        const { name, email, password, role } = req.body;
+        const { username, name, email, password, role } = req.body;
 
-        const userExists = await User.findOne({ email });
+        const userExists = await User.findOne({ $or: [{ email }, { username }] });
 
         if (userExists) {
-            return res.status(400).json({ message: 'User already exists' });
+            return res.status(400).json({
+                success: false,
+                message: 'User already exists'
+            });
         }
 
         const user = await User.create({
+            username,
             name,
             email,
             password,
-            role: role || 'employee',
+            role: role || 'staff',
         });
 
         if (user) {
             res.status(201).json({
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                token: generateToken(user._id),
+                success: true,
+                data: {
+                    user: {
+                        id: user._id,
+                        username: user.username,
+                        name: user.name,
+                        role: user.role
+                    },
+                    message: 'Đã tạo người dùng mới thành công'
+                }
             });
         } else {
-            res.status(400).json({ message: 'Invalid user data' });
+            res.status(400).json({
+                success: false,
+                message: 'Invalid user data'
+            });
         }
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({
+            success: false,
+            message: 'Server Error'
+        });
     }
 };
 
@@ -43,24 +58,35 @@ const registerUser = async (req, res) => {
 // @access  Public
 const loginUser = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { username, password } = req.body;
 
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ username });
 
         if (user && (await user.matchPassword(password))) {
             res.json({
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                token: generateToken(user._id),
+                success: true,
+                data: {
+                    token: generateToken(user._id),
+                    user: {
+                        id: user._id,
+                        username: user.username,
+                        name: user.name,
+                        role: user.role
+                    }
+                }
             });
         } else {
-            res.status(401).json({ message: 'Invalid email or password' });
+            res.status(401).json({
+                success: false,
+                message: 'Invalid username or password'
+            });
         }
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({
+            success: false,
+            message: 'Server Error'
+        });
     }
 };
 
@@ -73,17 +99,27 @@ const getUserProfile = async (req, res) => {
 
         if (user) {
             res.json({
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
+                success: true,
+                data: {
+                    id: user._id,
+                    username: user.username,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                }
             });
         } else {
-            res.status(404).json({ message: 'User not found' });
+            res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
         }
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({
+            success: false,
+            message: 'Server Error'
+        });
     }
 };
 
@@ -93,10 +129,102 @@ const getUserProfile = async (req, res) => {
 const getUsers = async (req, res) => {
     try {
         const users = await User.find({}).select('-password');
-        res.json(users);
+
+        const formattedUsers = users.map(user => ({
+            id: user._id,
+            username: user.username,
+            name: user.name,
+            role: user.role
+        }));
+
+        res.json({
+            success: true,
+            data: {
+                users: formattedUsers
+            }
+        });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({
+            success: false,
+            message: 'Server Error'
+        });
+    }
+};
+
+// @desc    Update user information
+// @route   PUT /api/users/:userId
+// @access  Private/Admin
+const updateUser = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.userId);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Update fields if provided in request
+        if (req.body.name) user.name = req.body.name;
+        if (req.body.role) user.role = req.body.role;
+        if (req.body.email) user.email = req.body.email;
+
+        // Only update password if provided
+        if (req.body.password) {
+            user.password = req.body.password;
+        }
+
+        const updatedUser = await user.save();
+
+        res.json({
+            success: true,
+            data: {
+                user: {
+                    id: updatedUser._id,
+                    username: updatedUser.username,
+                    name: updatedUser.name,
+                    role: updatedUser.role
+                },
+                message: 'Đã cập nhật thông tin người dùng thành công'
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error'
+        });
+    }
+};
+
+// @desc    Delete a user
+// @route   DELETE /api/users/:userId
+// @access  Private/Admin
+const deleteUser = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.userId);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        await user.remove();
+
+        res.json({
+            success: true,
+            message: 'Đã xóa người dùng thành công'
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error'
+        });
     }
 };
 
@@ -105,4 +233,6 @@ module.exports = {
     loginUser,
     getUserProfile,
     getUsers,
+    updateUser,
+    deleteUser
 };

@@ -14,10 +14,13 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-// Chỉ sử dụng routes attendance vì authentication được xử lý ở frontend
 app.use('/api/attendance', require('./routes/attendanceRoutes'));
 app.use('/api/offices', require('./routes/officeRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
+app.use('/api/shifts', require('./routes/shiftRoutes'));
+app.use('/api/live', require('./routes/liveRoutes'));
+app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/auth', require('./routes/authRoutes'));
 
 // Default route
 app.get('/', (req, res) => {
