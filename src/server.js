@@ -21,6 +21,7 @@ app.use('/api/shifts', require('./routes/shiftRoutes'));
 app.use('/api/live', require('./routes/liveRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/transactions', require('./routes/transactionRoutes'));
 
 // Default route
 app.get('/', (req, res) => {
