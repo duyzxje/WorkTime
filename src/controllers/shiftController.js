@@ -380,8 +380,134 @@ const toggleShift = async (req, res) => {
     }
 };
 
+// @desc    Delete all shifts for a specific user on a specific day
+// @route   DELETE /api/shifts/user/:userId/day/:day
+// @access  Private/Admin
+const deleteUserShift = async (req, res) => {
+    try {
+        const { userId, day } = req.params;
+        const { weekStartDate } = req.query;
+
+        if (!weekStartDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'Week start date is required as query parameter'
+            });
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            });
+        }
+
+        if (day < 1 || day > 7) {
+            return res.status(400).json({
+                success: false,
+                message: 'Day must be between 1 and 7'
+            });
+        }
+
+        // Parse and validate date
+        const startDate = new Date(weekStartDate);
+        if (isNaN(startDate.getTime())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid date format. Use YYYY-MM-DD'
+            });
+        }
+
+        // Check if user exists
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Find shift for this user, day and week
+        const shift = await Shift.findOne({
+            userId,
+            day: parseInt(day),
+            weekStartDate: startDate
+        });
+
+        if (!shift) {
+            return res.status(404).json({
+                success: false,
+                message: 'No shift found for this user, day and week'
+            });
+        }
+
+        // Delete the shift
+        await Shift.findByIdAndDelete(shift._id);
+
+        // Get all remaining shifts for this user in this week
+        const allShifts = await Shift.find({
+            userId,
+            weekStartDate: startDate
+        });
+
+        // Initialize shifts object with all days and all shift types set to false
+        const shiftsObject = {};
+        for (let d = 1; d <= 7; d++) {
+            shiftsObject[d] = {
+                morning: false,
+                noon: false,
+                afternoon: false,
+                evening: false,
+                off: false
+            };
+        }
+
+        // Update with actual registered shifts
+        allShifts.forEach(s => {
+            // Check if all work shifts are false and set off accordingly
+            const allWorkShiftsFalse = !s.morning && !s.noon && !s.afternoon && !s.evening;
+            const offStatus = allWorkShiftsFalse ? true : s.off;
+
+            shiftsObject[s.day] = {
+                morning: s.morning,
+                noon: s.noon,
+                afternoon: s.afternoon,
+                evening: s.evening,
+                off: offStatus
+            };
+        });
+
+        const dayMap = {
+            1: 'Thứ 2',
+            2: 'Thứ 3',
+            3: 'Thứ 4',
+            4: 'Thứ 5',
+            5: 'Thứ 6',
+            6: 'Thứ 7',
+            7: 'Chủ nhật'
+        };
+
+        res.json({
+            success: true,
+            data: {
+                userId,
+                username: user.name,
+                shifts: shiftsObject,
+                message: `Đã xóa lịch làm việc của ${user.name} cho ${dayMap[day]}`
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error'
+        });
+    }
+};
+
 module.exports = {
     getAllShifts,
     getUserShifts,
-    toggleShift
+    toggleShift,
+    deleteUserShift
 };

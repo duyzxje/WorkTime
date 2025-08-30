@@ -230,7 +230,108 @@ const updateLiveEvent = async (req, res) => {
     }
 };
 
+// @desc    Delete live event for a specific day
+// @route   DELETE /api/live/:day
+// @access  Private/Admin
+const deleteLiveEvent = async (req, res) => {
+    try {
+        const { day } = req.params;
+        const { weekStartDate } = req.query;
+
+        if (!weekStartDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'Week start date is required as query parameter'
+            });
+        }
+
+        if (day < 1 || day > 7) {
+            return res.status(400).json({
+                success: false,
+                message: 'Day must be between 1 and 7'
+            });
+        }
+
+        // Parse and validate date
+        const startDate = new Date(weekStartDate);
+        if (isNaN(startDate.getTime())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid date format. Use YYYY-MM-DD'
+            });
+        }
+
+        // Find live event for this day and week
+        const liveEvent = await Live.findOne({
+            day: parseInt(day),
+            weekStartDate: startDate
+        });
+
+        if (!liveEvent) {
+            return res.status(404).json({
+                success: false,
+                message: 'No live event found for this day and week'
+            });
+        }
+
+        // Delete the live event
+        await Live.findByIdAndDelete(liveEvent._id);
+
+        // Get all remaining live events for this week
+        const allLiveEvents = await Live.find({
+            weekStartDate: startDate
+        });
+
+        // Initialize schedule with empty arrays for all days
+        const schedule = {};
+        for (let i = 1; i <= 7; i++) {
+            schedule[i] = [];
+        }
+
+        // Update with actual live events
+        allLiveEvents.forEach(event => {
+            const shifts = [];
+            if (event.morning) shifts.push('morning');
+            if (event.noon) shifts.push('noon');
+            if (event.afternoon) shifts.push('afternoon');
+            if (event.evening) shifts.push('evening');
+            if (event.off) shifts.push('off');
+
+            schedule[event.day] = shifts;
+        });
+
+        const dayMap = {
+            1: 'Thứ 2',
+            2: 'Thứ 3',
+            3: 'Thứ 4',
+            4: 'Thứ 5',
+            5: 'Thứ 6',
+            6: 'Thứ 7',
+            7: 'Chủ nhật'
+        };
+
+        const endDate = getWeekEndDate(startDate);
+
+        res.json({
+            success: true,
+            data: {
+                schedule,
+                weekStartDate: weekStartDate,
+                weekEndDate: endDate.toISOString().split('T')[0],
+                message: `Đã xóa lịch Live cho ${dayMap[day]}`
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error'
+        });
+    }
+};
+
 module.exports = {
     getLiveEvents,
-    updateLiveEvent
+    updateLiveEvent,
+    deleteLiveEvent
 };

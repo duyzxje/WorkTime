@@ -1,5 +1,5 @@
 const express = require('express');
-const { getLiveEvents, updateLiveEvent } = require('../controllers/liveController');
+const { getLiveEvents, updateLiveEvent, deleteLiveEvent } = require('../controllers/liveController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -13,5 +13,10 @@ router.get('/', protect, getLiveEvents);
 // @desc    Update live event for a day
 // @access  Private/Admin
 router.post('/update', protect, admin, updateLiveEvent);
+
+// @route   DELETE /api/live/:day
+// @desc    Delete live event for a specific day
+// @access  Private/Admin
+router.delete('/:day', protect, admin, deleteLiveEvent);
 
 module.exports = router;
