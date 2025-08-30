@@ -52,14 +52,21 @@ const getAllShifts = async (req, res) => {
         const employeeData = [];
         const liveSchedule = {};
 
-        // Initialize live schedule with "off" for all days
+        // Initialize live schedule with empty arrays for all days
         for (let i = 1; i <= 7; i++) {
-            liveSchedule[i] = "off";
+            liveSchedule[i] = [];
         }
 
         // Update with actual live events
         liveEvents.forEach(event => {
-            liveSchedule[event.day] = event.shiftType;
+            const shifts = [];
+            if (event.morning) shifts.push('morning');
+            if (event.noon) shifts.push('noon');
+            if (event.afternoon) shifts.push('afternoon');
+            if (event.evening) shifts.push('evening');
+
+            // If no shifts are selected, mark as "off"
+            liveSchedule[event.day] = shifts.length > 0 ? shifts : ['off'];
         });
 
         // Process shift data for each user (excluding admins)
@@ -75,7 +82,8 @@ const getAllShifts = async (req, res) => {
                     morning: false,
                     noon: false,
                     afternoon: false,
-                    evening: false
+                    evening: false,
+                    off: false
                 };
             }
 
@@ -85,13 +93,15 @@ const getAllShifts = async (req, res) => {
                     morning: shift.morning,
                     noon: shift.noon,
                     afternoon: shift.afternoon,
-                    evening: shift.evening
+                    evening: shift.evening,
+                    off: shift.off
                 };
             });
 
             employeeData.push({
                 userId: user._id,
-                username: user.name,
+                username: user.username,
+                name: user.name,
                 shifts: shiftsObject
             });
         });
@@ -162,7 +172,8 @@ const getUserShifts = async (req, res) => {
                 morning: false,
                 noon: false,
                 afternoon: false,
-                evening: false
+                evening: false,
+                off: false
             };
         }
 
@@ -172,7 +183,8 @@ const getUserShifts = async (req, res) => {
                 morning: shift.morning,
                 noon: shift.noon,
                 afternoon: shift.afternoon,
-                evening: shift.evening
+                evening: shift.evening,
+                off: shift.off
             };
         });
 
@@ -216,11 +228,11 @@ const toggleShift = async (req, res) => {
             });
         }
 
-        const validShiftTypes = ['morning', 'noon', 'afternoon', 'evening'];
+        const validShiftTypes = ['morning', 'noon', 'afternoon', 'evening', 'off'];
         if (!validShiftTypes.includes(shiftType)) {
             return res.status(400).json({
                 success: false,
-                message: 'Shift type must be morning, noon, afternoon, or evening'
+                message: 'Shift type must be morning, noon, afternoon, evening, or off'
             });
         }
 
@@ -258,7 +270,8 @@ const toggleShift = async (req, res) => {
                 morning: false,
                 noon: false,
                 afternoon: false,
-                evening: false
+                evening: false,
+                off: false
             });
         }
 
@@ -272,7 +285,8 @@ const toggleShift = async (req, res) => {
             morning: 'Sáng',
             noon: 'Trưa',
             afternoon: 'Chiều',
-            evening: 'Tối'
+            evening: 'Tối',
+            off: 'Nghỉ'
         };
         const dayMap = {
             1: 'Thứ 2',
@@ -297,7 +311,8 @@ const toggleShift = async (req, res) => {
                 morning: false,
                 noon: false,
                 afternoon: false,
-                evening: false
+                evening: false,
+                off: false
             };
         }
 
@@ -307,7 +322,8 @@ const toggleShift = async (req, res) => {
                 morning: s.morning,
                 noon: s.noon,
                 afternoon: s.afternoon,
-                evening: s.evening
+                evening: s.evening,
+                off: s.off
             };
         });
 

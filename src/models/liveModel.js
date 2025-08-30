@@ -13,10 +13,21 @@ const liveSchema = mongoose.Schema(
             min: 1,
             max: 7
         },
-        shiftType: {
-            type: String,
-            enum: ['morning', 'noon', 'afternoon', 'evening', 'off'],
-            default: 'off'
+        morning: {
+            type: Boolean,
+            default: false
+        },
+        noon: {
+            type: Boolean,
+            default: false
+        },
+        afternoon: {
+            type: Boolean,
+            default: false
+        },
+        evening: {
+            type: Boolean,
+            default: false
         }
     },
     {

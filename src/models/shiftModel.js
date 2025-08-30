@@ -33,6 +33,10 @@ const shiftSchema = mongoose.Schema(
         evening: {
             type: Boolean,
             default: false
+        },
+        off: {
+            type: Boolean,
+            default: false
         }
     },
     {

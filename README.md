@@ -76,7 +76,7 @@ Backend service for employee attendance tracking with GPS validation.
   - Required body: `{ userId, day, shiftType, weekStartDate }`
   - Where:
     - `day`: number (1-7)
-    - `shiftType`: string ("morning", "noon", "afternoon", "evening")
+    - `shiftType`: string ("morning", "noon", "afternoon", "evening", "off")
     - `weekStartDate`: string (YYYY-MM-DD)
 
 ### Live Events
@@ -84,12 +84,13 @@ Backend service for employee attendance tracking with GPS validation.
 - `GET /api/live` - Get live events schedule for the week
   - Required query params: `weekStartDate` (YYYY-MM-DD)
 
-- `POST /api/live/update` - Update live event for a day (admin only)
-  - Required body: `{ day, shiftType, weekStartDate }`
+- `POST /api/live/update` - Add/Remove live event for a day (admin only)
+  - Required body: `{ day, shiftType, weekStartDate, action }`
   - Where:
     - `day`: number (1-7)
-    - `shiftType`: string ("morning", "noon", "afternoon", "evening", "off")
+    - `shiftType`: string ("morning", "noon", "afternoon", "evening")
     - `weekStartDate`: string (YYYY-MM-DD)
+    - `action`: string ("add" or "remove")
 
 ### Users
 
@@ -217,8 +218,12 @@ Các bước triển khai lên Render:
 - `noon`: Boolean
 - `afternoon`: Boolean
 - `evening`: Boolean
+- `off`: Boolean
 
 ### Live
 - `weekStartDate`: Date
 - `day`: Number (1-7)
-- `shiftType`: String (morning, noon, afternoon, evening, off)
+- `morning`: Boolean
+- `noon`: Boolean
+- `afternoon`: Boolean
+- `evening`: Boolean
