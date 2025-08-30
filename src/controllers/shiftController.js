@@ -40,8 +40,8 @@ const getAllShifts = async (req, res) => {
             weekStartDate: startDate
         }).populate('userId', 'username name');
 
-        // Get all users
-        const users = await User.find().select('_id username name');
+        // Get all users except admin users
+        const users = await User.find({ role: { $ne: 'admin' } }).select('_id username name');
 
         // Get live events for this week
         const liveEvents = await Live.find({
@@ -62,7 +62,7 @@ const getAllShifts = async (req, res) => {
             liveSchedule[event.day] = event.shiftType;
         });
 
-        // Process shift data for each user
+        // Process shift data for each user (excluding admins)
         users.forEach(user => {
             const userShifts = shifts.filter(
                 shift => shift.userId._id.toString() === user._id.toString()
