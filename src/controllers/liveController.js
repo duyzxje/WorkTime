@@ -50,9 +50,9 @@ const getLiveEvents = async (req, res) => {
             if (event.noon) shifts.push('noon');
             if (event.afternoon) shifts.push('afternoon');
             if (event.evening) shifts.push('evening');
-            
-            // If no shifts are selected, mark as "off"
-            schedule[event.day] = shifts.length > 0 ? shifts : ['off'];
+            if (event.off) shifts.push('off');
+
+            schedule[event.day] = shifts;
         });
 
         res.json({
@@ -78,43 +78,43 @@ const getLiveEvents = async (req, res) => {
 const updateLiveEvent = async (req, res) => {
     try {
         const { day, shiftType, weekStartDate, action } = req.body;
-        
+
         if (!day || !shiftType || !weekStartDate || !action) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Day, shift type, week start date, and action are required' 
+            return res.status(400).json({
+                success: false,
+                message: 'Day, shift type, week start date, and action are required'
             });
         }
 
         if (day < 1 || day > 7) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Day must be between 1 and 7' 
+            return res.status(400).json({
+                success: false,
+                message: 'Day must be between 1 and 7'
             });
         }
 
-        const validShiftTypes = ['morning', 'noon', 'afternoon', 'evening'];
+        const validShiftTypes = ['morning', 'noon', 'afternoon', 'evening', 'off'];
         if (!validShiftTypes.includes(shiftType)) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Shift type must be morning, noon, afternoon, or evening' 
+            return res.status(400).json({
+                success: false,
+                message: 'Shift type must be morning, noon, afternoon, evening, or off'
             });
         }
 
         const validActions = ['add', 'remove'];
         if (!validActions.includes(action)) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Action must be add or remove' 
+            return res.status(400).json({
+                success: false,
+                message: 'Action must be add or remove'
             });
         }
 
         // Parse and validate date
         const startDate = new Date(weekStartDate);
         if (isNaN(startDate.getTime())) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Invalid date format. Use YYYY-MM-DD' 
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid date format. Use YYYY-MM-DD'
             });
         }
 
@@ -138,9 +138,27 @@ const updateLiveEvent = async (req, res) => {
 
         // Update the specified shift type based on action
         if (action === 'add') {
-            liveEvent[shiftType] = true;
+            if (shiftType === 'off') {
+                // Khi thêm ca 'off', set tất cả ca khác về false
+                liveEvent.morning = false;
+                liveEvent.noon = false;
+                liveEvent.afternoon = false;
+                liveEvent.evening = false;
+            } else {
+                // Khi thêm ca khác, set ca đó về true
+                liveEvent[shiftType] = true;
+            }
         } else if (action === 'remove') {
-            liveEvent[shiftType] = false;
+            if (shiftType === 'off') {
+                // Khi hủy ca 'off', không làm gì cả (vì off được tính tự động)
+                return res.status(400).json({
+                    success: false,
+                    message: 'Không thể hủy ca off. Hãy thêm ít nhất một ca làm việc.'
+                });
+            } else {
+                // Khi hủy ca khác, set ca đó về false
+                liveEvent[shiftType] = false;
+            }
         }
 
         await liveEvent.save();
@@ -163,16 +181,17 @@ const updateLiveEvent = async (req, res) => {
             if (event.noon) shifts.push('noon');
             if (event.afternoon) shifts.push('afternoon');
             if (event.evening) shifts.push('evening');
-            
-            // If no shifts are selected, mark as "off"
-            schedule[event.day] = shifts.length > 0 ? shifts : ['off'];
+            if (event.off) shifts.push('off');
+
+            schedule[event.day] = shifts;
         });
 
         const shiftTypeMap = {
             morning: 'Sáng',
             noon: 'Trưa',
             afternoon: 'Chiều',
-            evening: 'Tối'
+            evening: 'Tối',
+            off: 'Nghỉ'
         };
 
         const dayMap = {

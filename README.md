@@ -11,7 +11,7 @@ Backend service for employee attendance tracking with GPS validation.
 - Manual check-out for forgotten check-outs
 - Admin features for managing office locations
 - Work shift registration system (morning, noon, afternoon, evening, off)
-- Live event schedule management
+- Live event schedule management with automatic "off" calculation
 - User management with role-based access control
 
 ## Tech Stack
@@ -20,6 +20,77 @@ Backend service for employee attendance tracking with GPS validation.
 - Express
 - MongoDB Atlas
 - Geospatial validation
+
+## Models
+
+### Live Event Schema
+```javascript
+{
+  weekStartDate: Date,    // Ngày bắt đầu tuần
+  day: Number,            // Ngày trong tuần (1-7: Thứ 2 - Chủ nhật)
+  morning: Boolean,       // Ca sáng
+  noon: Boolean,          // Ca trưa
+  afternoon: Boolean,     // Ca chiều
+  evening: Boolean,       // Ca tối
+  off: Boolean,           // Ca nghỉ (tự động tính toán)
+  timestamps: true
+}
+```
+
+**Logic tự động:**
+- `off = true` khi tất cả ca khác đều `false`
+- `off = false` khi có ít nhất 1 ca khác là `true`
+- Field `off` được cập nhật tự động trước khi lưu vào database
+
+### Attendance Schema
+```javascript
+{
+  user: ObjectId,         // ID người dùng
+  checkInTime: Date,      // Thời gian check-in
+  checkOutTime: Date,     // Thời gian check-out
+  checkInLocation: {      // Vị trí check-in
+    type: 'Point',
+    coordinates: [Number]  // [longitude, latitude]
+  },
+  checkOutLocation: {     // Vị trí check-out
+    type: 'Point',
+    coordinates: [Number]  // [longitude, latitude]
+  },
+  status: String,         // 'checked-in' hoặc 'checked-out'
+  isValid: Boolean,       // Vị trí GPS có hợp lệ không
+  officeId: String,       // ID văn phòng
+  workDuration: Number,   // Thời gian làm việc (phút)
+  notes: String,          // Ghi chú
+  timestamps: true
+}
+```
+
+### User Schema
+```javascript
+{
+  username: String,       // Tên đăng nhập
+  name: String,           // Họ tên
+  email: String,          // Email
+  password: String,       // Mật khẩu (đã hash)
+  role: String,           // 'admin', 'staff', 'viewer'
+  timestamps: true
+}
+```
+
+### Office Schema
+```javascript
+{
+  officeId: String,       // ID văn phòng
+  name: String,           // Tên văn phòng
+  location: {             // Vị trí văn phòng
+    type: 'Point',
+    coordinates: [Number]  // [longitude, latitude]
+  },
+  radius: Number,         // Bán kính cho phép (mét)
+  address: String,        // Địa chỉ
+  timestamps: true
+}
+```
 
 ## API Endpoints
 
@@ -88,7 +159,7 @@ Backend service for employee attendance tracking with GPS validation.
   - Required body: `{ day, shiftType, weekStartDate, action }`
   - Where:
     - `day`: number (1-7)
-    - `shiftType`: string ("morning", "noon", "afternoon", "evening")
+    - `shiftType`: string ("morning", "noon", "afternoon", "evening", "off")
     - `weekStartDate`: string (YYYY-MM-DD)
     - `action`: string ("add" or "remove")
 
@@ -135,8 +206,13 @@ Backend service for employee attendance tracking with GPS validation.
 ### Lịch Live
 
 1. Quản trị viên có thể cập nhật lịch Live cho từng ngày trong tuần
-2. Mỗi ngày có thể có một trạng thái Live: sáng, trưa, chiều, tối hoặc off
-3. Người dùng có thể xem lịch Live của toàn bộ tuần
+2. Mỗi ngày có thể có nhiều ca Live: sáng, trưa, chiều, tối hoặc off
+3. Field `off` được tự động tính toán:
+   - `off = true` khi tất cả các ca khác (morning, noon, afternoon, evening) đều `false`
+   - `off = false` khi có ít nhất một ca khác là `true`
+4. Khi thêm ca "off", tất cả các ca khác sẽ tự động được set về `false`
+5. Không thể hủy ca "off" trực tiếp - phải thêm ít nhất một ca làm việc
+6. Người dùng có thể xem lịch Live của toàn bộ tuần
 
 ## Khởi tạo dữ liệu văn phòng
 
