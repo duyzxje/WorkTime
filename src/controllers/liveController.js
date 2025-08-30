@@ -140,27 +140,11 @@ const updateLiveEvent = async (req, res) => {
 
         // Update the specified shift type based on action
         if (action === 'add') {
-            if (shiftType === 'off') {
-                // Khi thêm ca 'off', set tất cả ca khác về false
-                liveEvent.morning = false;
-                liveEvent.noon = false;
-                liveEvent.afternoon = false;
-                liveEvent.evening = false;
-            } else {
-                // Khi thêm ca khác, set ca đó về true
-                liveEvent[shiftType] = true;
-            }
+            // Khi thêm ca, set ca đó về true
+            liveEvent[shiftType] = true;
         } else if (action === 'remove') {
-            if (shiftType === 'off') {
-                // Khi hủy ca 'off', không làm gì cả (vì off được tính tự động)
-                return res.status(400).json({
-                    success: false,
-                    message: 'Không thể hủy ca off. Hãy thêm ít nhất một ca làm việc.'
-                });
-            } else {
-                // Khi hủy ca khác, set ca đó về false
-                liveEvent[shiftType] = false;
-            }
+            // Khi hủy ca, set ca đó về false
+            liveEvent[shiftType] = false;
         }
 
         await liveEvent.save();

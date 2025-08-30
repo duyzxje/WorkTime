@@ -39,18 +39,7 @@ const liveSchema = mongoose.Schema(
     }
 );
 
-// Pre-save middleware to automatically calculate 'off' field
-liveSchema.pre('save', function (next) {
-    try {
-        // off = true khi tất cả các ca khác đều false
-        // off = false khi có ít nhất 1 ca khác là true
-        this.off = !(this.morning || this.noon || this.afternoon || this.evening);
-        next();
-    } catch (error) {
-        console.error('Error in pre-save middleware:', error);
-        next(error);
-    }
-});
+
 
 // Create a compound unique index to prevent duplicate entries for the same day in a week
 liveSchema.index({ weekStartDate: 1, day: 1 }, { unique: true });

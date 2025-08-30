@@ -209,20 +209,19 @@ Backend service for employee attendance tracking with GPS validation.
 ### Đăng ký ca làm việc
 
 1. Người dùng có thể xem lịch đăng ký ca làm việc theo tuần
-2. Người dùng có thể đăng ký nhiều ca làm việc trong cùng một ngày (sáng, trưa, chiều, tối)
-3. Khi người dùng đăng ký hoặc hủy đăng ký ca làm việc, hệ thống sẽ cập nhật trạng thái ca làm việc
-4. Quản trị viên có thể xem đăng ký ca làm việc của tất cả người dùng
-5. Quản trị viên có thể xóa toàn bộ lịch làm việc của một user trong một ngày cụ thể
+2. Người dùng có thể đăng ký nhiều ca làm việc trong cùng một ngày (sáng, trưa, chiều, tối, off)
+3. Field `off` được quản lý độc lập với các ca khác
+4. Khi người dùng đăng ký hoặc hủy đăng ký ca làm việc, hệ thống sẽ cập nhật trạng thái ca làm việc
+5. Quản trị viên có thể xem đăng ký ca làm việc của tất cả người dùng
+6. Quản trị viên có thể xóa toàn bộ lịch làm việc của một user trong một ngày cụ thể
 
 ### Lịch Live
 
 1. Quản trị viên có thể cập nhật lịch Live cho từng ngày trong tuần
 2. Mỗi ngày có thể có nhiều ca Live: sáng, trưa, chiều, tối hoặc off
-3. Field `off` được tự động tính toán:
-   - `off = true` khi tất cả các ca khác (morning, noon, afternoon, evening) đều `false`
-   - `off = false` khi có ít nhất một ca khác là `true`
-4. Khi thêm ca "off", tất cả các ca khác sẽ tự động được set về `false`
-5. Không thể hủy ca "off" trực tiếp - phải thêm ít nhất một ca làm việc
+3. Field `off` được quản lý độc lập với các ca khác
+4. Người dùng có thể tự do chọn ca "off" mà không bị ảnh hưởng bởi các ca khác
+5. Field `off` không còn được tự động tính toán dựa trên các ca khác
 6. Quản trị viên có thể xóa toàn bộ lịch Live của một ngày cụ thể
 7. Người dùng có thể xem lịch Live của toàn bộ tuần
 

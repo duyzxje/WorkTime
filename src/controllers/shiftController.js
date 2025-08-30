@@ -89,16 +89,12 @@ const getAllShifts = async (req, res) => {
 
             // Update with actual registered shifts
             userShifts.forEach(shift => {
-                // Check if all work shifts are false and set off accordingly
-                const allWorkShiftsFalse = !shift.morning && !shift.noon && !shift.afternoon && !shift.evening;
-                const offStatus = allWorkShiftsFalse ? true : shift.off;
-
                 shiftsObject[shift.day] = {
                     morning: shift.morning,
                     noon: shift.noon,
                     afternoon: shift.afternoon,
                     evening: shift.evening,
-                    off: offStatus
+                    off: shift.off
                 };
             });
 
@@ -183,16 +179,12 @@ const getUserShifts = async (req, res) => {
 
         // Update with actual registered shifts
         shifts.forEach(shift => {
-            // Check if all work shifts are false and set off accordingly
-            const allWorkShiftsFalse = !shift.morning && !shift.noon && !shift.afternoon && !shift.evening;
-            const offStatus = allWorkShiftsFalse ? true : shift.off;
-
             shiftsObject[shift.day] = {
                 morning: shift.morning,
                 noon: shift.noon,
                 afternoon: shift.afternoon,
                 evening: shift.evening,
-                off: offStatus
+                off: shift.off
             };
         });
 
@@ -286,28 +278,6 @@ const toggleShift = async (req, res) => {
         // Toggle the specified shift type
         shift[shiftType] = !shift[shiftType];
 
-        // If the shift type being toggled is not "off", handle the off logic
-        if (shiftType !== 'off') {
-            // Check if all work shifts are false
-            const allWorkShiftsFalse = !shift.morning && !shift.noon && !shift.afternoon && !shift.evening;
-
-            // If all work shifts are false, set off to true
-            if (allWorkShiftsFalse) {
-                shift.off = true;
-            } else {
-                // If any work shift is true, set off to false
-                shift.off = false;
-            }
-        } else {
-            // If toggling "off", ensure all other shifts are false when off is true
-            if (shift.off) {
-                shift.morning = false;
-                shift.noon = false;
-                shift.afternoon = false;
-                shift.evening = false;
-            }
-        }
-
         await shift.save();
 
         // Determine action taken
@@ -349,16 +319,12 @@ const toggleShift = async (req, res) => {
 
         // Update with actual registered shifts
         allShifts.forEach(s => {
-            // Check if all work shifts are false and set off accordingly
-            const allWorkShiftsFalse = !s.morning && !s.noon && !s.afternoon && !s.evening;
-            const offStatus = allWorkShiftsFalse ? true : s.off;
-
             shiftsObject[s.day] = {
                 morning: s.morning,
                 noon: s.noon,
                 afternoon: s.afternoon,
                 evening: s.evening,
-                off: offStatus
+                off: s.off
             };
         });
 
@@ -464,16 +430,12 @@ const deleteUserShift = async (req, res) => {
 
         // Update with actual registered shifts
         allShifts.forEach(s => {
-            // Check if all work shifts are false and set off accordingly
-            const allWorkShiftsFalse = !s.morning && !s.noon && !s.afternoon && !s.evening;
-            const offStatus = allWorkShiftsFalse ? true : s.off;
-
             shiftsObject[s.day] = {
                 morning: s.morning,
                 noon: s.noon,
                 afternoon: s.afternoon,
                 evening: s.evening,
-                off: offStatus
+                off: s.off
             };
         });
 
