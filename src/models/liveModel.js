@@ -45,12 +45,6 @@ liveSchema.pre('save', function (next) {
         // off = true khi tất cả các ca khác đều false
         // off = false khi có ít nhất 1 ca khác là true
         this.off = !(this.morning || this.noon || this.afternoon || this.evening);
-        console.log('Pre-save middleware: calculated off =', this.off, 'for shifts:', {
-            morning: this.morning,
-            noon: this.noon,
-            afternoon: this.afternoon,
-            evening: this.evening
-        });
         next();
     } catch (error) {
         console.error('Error in pre-save middleware:', error);
