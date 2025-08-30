@@ -59,14 +59,14 @@ const getAllShifts = async (req, res) => {
 
         // Update with actual live events
         liveEvents.forEach(event => {
-            const shifts = [];
-            if (event.morning) shifts.push('morning');
-            if (event.noon) shifts.push('noon');
-            if (event.afternoon) shifts.push('afternoon');
-            if (event.evening) shifts.push('evening');
+            const liveShifts = [];
+            if (event.morning) liveShifts.push('morning');
+            if (event.noon) liveShifts.push('noon');
+            if (event.afternoon) liveShifts.push('afternoon');
+            if (event.evening) liveShifts.push('evening');
 
             // If no shifts are selected, mark as "off"
-            liveSchedule[event.day] = shifts.length > 0 ? shifts : ['off'];
+            liveSchedule[event.day] = liveShifts.length > 0 ? liveShifts : ['off'];
         });
 
         // Process shift data for each user (excluding admins)

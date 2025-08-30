@@ -1,5 +1,5 @@
 const express = require('express');
-const { getShifts, getUserShifts, toggleShift, deleteUserShift } = require('../controllers/shiftController');
+const { getAllShifts, getUserShifts, toggleShift, deleteUserShift } = require('../controllers/shiftController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -7,7 +7,7 @@ const router = express.Router();
 // @route   GET /api/shifts
 // @desc    Get all shift registrations for the week
 // @access  Private
-router.get('/', protect, getShifts);
+router.get('/', protect, getAllShifts);
 
 // @route   GET /api/shifts/user/:userId
 // @desc    Get shifts for a specific user
