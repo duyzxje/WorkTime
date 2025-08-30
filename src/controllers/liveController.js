@@ -77,12 +77,30 @@ const getLiveEvents = async (req, res) => {
 // @access  Private/Admin
 const updateLiveEvent = async (req, res) => {
     try {
+        console.log('=== UPDATE LIVE EVENT REQUEST ===');
+        console.log('Request body:', req.body);
+        console.log('Request headers:', req.headers);
+        console.log('Content-Type:', req.headers['content-type']);
+
         const { day, shiftType, weekStartDate, action } = req.body;
 
+        console.log('Extracted values:', { day, shiftType, weekStartDate, action });
+        console.log('Type of day:', typeof day);
+        console.log('Type of shiftType:', typeof shiftType);
+        console.log('Type of weekStartDate:', typeof weekStartDate);
+        console.log('Type of action:', typeof action);
+
         if (!day || !shiftType || !weekStartDate || !action) {
+            console.log('Missing required fields');
+            console.log('day exists:', !!day);
+            console.log('shiftType exists:', !!shiftType);
+            console.log('weekStartDate exists:', !!weekStartDate);
+            console.log('action exists:', !!action);
+
             return res.status(400).json({
                 success: false,
-                message: 'Day, shift type, week start date, and action are required'
+                message: 'Day, shift type, week start date, and action are required',
+                received: { day, shiftType, weekStartDate, action }
             });
         }
 
@@ -161,7 +179,19 @@ const updateLiveEvent = async (req, res) => {
             }
         }
 
-        await liveEvent.save();
+        console.log('About to save live event:', liveEvent);
+
+        try {
+            await liveEvent.save();
+            console.log('Live event saved successfully');
+        } catch (saveError) {
+            console.error('Error saving live event:', saveError);
+            return res.status(500).json({
+                success: false,
+                message: 'Error saving live event',
+                error: saveError.message
+            });
+        }
 
         // Get all live events for this week
         const allLiveEvents = await Live.find({
