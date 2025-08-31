@@ -150,10 +150,15 @@ Backend service for employee attendance tracking with GPS validation.
     - `shiftType`: string ("morning", "noon", "afternoon", "evening", "off")
     - `weekStartDate`: string (YYYY-MM-DD)
 
+- `DELETE /api/shifts/own/:day` - Delete all shifts for the current user on a specific day
+  - Required params: `day` (1-7)
+  - Required query: `weekStartDate` (YYYY-MM-DD)
+  - Users can delete their own shift schedule for a specific day
+
 - `DELETE /api/shifts/user/:userId/day/:day` - Delete all shifts for a specific user on a specific day (admin only)
   - Required params: `userId` (ObjectId), `day` (1-7)
   - Required query: `weekStartDate` (YYYY-MM-DD)
-  - Deletes entire shift schedule for the specified user and day
+  - Admin can delete entire shift schedule for any specified user and day
 
 ### Live Events
 
@@ -212,8 +217,9 @@ Backend service for employee attendance tracking with GPS validation.
 2. Người dùng có thể đăng ký nhiều ca làm việc trong cùng một ngày (sáng, trưa, chiều, tối, off)
 3. Field `off` được quản lý độc lập với các ca khác
 4. Khi người dùng đăng ký hoặc hủy đăng ký ca làm việc, hệ thống sẽ cập nhật trạng thái ca làm việc
-5. Quản trị viên có thể xem đăng ký ca làm việc của tất cả người dùng
-6. Quản trị viên có thể xóa toàn bộ lịch làm việc của một user trong một ngày cụ thể
+5. Người dùng có thể xóa toàn bộ lịch làm việc của chính họ cho một ngày cụ thể
+6. Quản trị viên có thể xem đăng ký ca làm việc của tất cả người dùng
+7. Quản trị viên có thể xóa toàn bộ lịch làm việc của một user trong một ngày cụ thể
 
 ### Lịch Live
 

@@ -467,9 +467,115 @@ const deleteUserShift = async (req, res) => {
     }
 };
 
+// @desc    Delete all shifts for the current user on a specific day
+// @route   DELETE /api/shifts/own/:day
+// @access  Private
+const deleteOwnShift = async (req, res) => {
+    try {
+        const { day } = req.params;
+        const { weekStartDate } = req.query;
+        const userId = req.user.id; // Get current user ID from auth middleware
+
+        if (!weekStartDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'Week start date is required as query parameter'
+            });
+        }
+
+        if (day < 1 || day > 7) {
+            return res.status(400).json({
+                success: false,
+                message: 'Day must be between 1 and 7'
+            });
+        }
+
+        // Parse and validate date
+        const startDate = new Date(weekStartDate);
+        if (isNaN(startDate.getTime())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid date format. Use YYYY-MM-DD'
+            });
+        }
+
+        // Find shift for current user, day and week
+        const shift = await Shift.findOne({
+            userId,
+            day: parseInt(day),
+            weekStartDate: startDate
+        });
+
+        if (!shift) {
+            return res.status(404).json({
+                success: false,
+                message: 'No shift found for this day and week'
+            });
+        }
+
+        // Delete the shift
+        await Shift.findByIdAndDelete(shift._id);
+
+        // Get all remaining shifts for current user in this week
+        const allShifts = await Shift.find({
+            userId,
+            weekStartDate: startDate
+        });
+
+        // Initialize shifts object with all days and all shift types set to false
+        const shiftsObject = {};
+        for (let d = 1; d <= 7; d++) {
+            shiftsObject[d] = {
+                morning: false,
+                noon: false,
+                afternoon: false,
+                evening: false,
+                off: false
+            };
+        }
+
+        // Update with actual registered shifts
+        allShifts.forEach(s => {
+            shiftsObject[s.day] = {
+                morning: s.morning,
+                noon: s.noon,
+                afternoon: s.afternoon,
+                evening: s.evening,
+                off: s.off
+            };
+        });
+
+        const dayMap = {
+            1: 'Thứ 2',
+            2: 'Thứ 3',
+            3: 'Thứ 4',
+            4: 'Thứ 5',
+            5: 'Thứ 6',
+            6: 'Thứ 7',
+            7: 'Chủ nhật'
+        };
+
+        res.json({
+            success: true,
+            data: {
+                userId,
+                shifts: shiftsObject,
+                message: `Đã xóa lịch làm việc của bạn cho ${dayMap[day]}`
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error'
+        });
+    }
+};
+
 module.exports = {
     getAllShifts,
     getUserShifts,
     toggleShift,
-    deleteUserShift
+    deleteUserShift,
+    deleteOwnShift
 };
