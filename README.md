@@ -13,6 +13,7 @@ Backend service for employee attendance tracking with GPS validation.
 - Work shift registration system (morning, noon, afternoon, evening, off)
 - Live event schedule management with automatic "off" calculation
 - User management with role-based access control
+- **Dashboard statistics**: Total employees count and currently working employees
 
 ## Tech Stack
 
@@ -182,6 +183,13 @@ Backend service for employee attendance tracking with GPS validation.
 
 - `GET /api/users` - Get all users (admin only)
 
+- `GET /api/users/count` - Get total employees count (admin only)
+  - Returns: `{ success: true, data: { totalEmployees: number } }`
+
+- `GET /api/users/currently-working` - Get currently working employees (admin only)
+  - Returns employees who have checked in but not checked out
+  - Returns: `{ success: true, data: { currentlyWorking: array, count: number } }`
+
 - `POST /api/users` - Create a new user (admin only)
   - Required body: `{ username, name, password, email }`
   - Optional body: `{ role }` ("admin", "staff", "viewer")
@@ -201,6 +209,19 @@ Backend service for employee attendance tracking with GPS validation.
 - `GET /api/auth/verify` - Verify token and get user data
 
 ## Cách hoạt động
+
+### Dashboard Statistics
+
+Hệ thống cung cấp thống kê tổng quan cho quản trị viên:
+
+1. **Tổng số nhân viên**: Đếm tổng số người dùng trong hệ thống
+   - Endpoint: `GET /api/users/count`
+   - Trả về số lượng nhân viên hiện có
+
+2. **Nhân viên đang làm việc**: Hiển thị danh sách nhân viên đã check-in nhưng chưa check-out
+   - Endpoint: `GET /api/users/currently-working`
+   - Trả về thông tin chi tiết: tên, username, email, thời gian check-in, văn phòng
+   - Thời gian được định dạng theo múi giờ Việt Nam
 
 ### Chấm công
 

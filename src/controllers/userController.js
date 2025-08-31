@@ -228,11 +228,83 @@ const deleteUser = async (req, res) => {
     }
 };
 
+// @desc    Get total employees count
+// @route   GET /api/users/count
+// @access  Private/Admin
+const getTotalEmployees = async (req, res) => {
+    try {
+        const totalCount = await User.countDocuments({});
+
+        res.json({
+            success: true,
+            data: {
+                totalEmployees: totalCount
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error'
+        });
+    }
+};
+
+// @desc    Get currently working employees (checked in but not checked out)
+// @route   GET /api/users/currently-working
+// @access  Private/Admin
+const getCurrentlyWorkingEmployees = async (req, res) => {
+    try {
+        const Attendance = require('../models/attendanceModel');
+
+        // Find all users who are currently checked in (status: 'checked-in')
+        const currentlyWorking = await Attendance.find({ status: 'checked-in' })
+            .populate('user', 'name username email role')
+            .sort('-checkInTime');
+
+        // Format the response
+        const workingEmployees = currentlyWorking.map(attendance => ({
+            userId: attendance.user._id,
+            name: attendance.user.name,
+            username: attendance.user.username,
+            email: attendance.user.email,
+            role: attendance.user.role,
+            checkInTime: attendance.checkInTime,
+            checkInTimeFormatted: new Date(attendance.checkInTime).toLocaleTimeString('vi-VN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'Asia/Ho_Chi_Minh'
+            }),
+            checkInDateFormatted: new Date(attendance.checkInTime).toLocaleDateString('vi-VN', {
+                timeZone: 'Asia/Ho_Chi_Minh'
+            }),
+            officeId: attendance.officeId,
+            notes: attendance.notes
+        }));
+
+        res.json({
+            success: true,
+            data: {
+                currentlyWorking: workingEmployees,
+                count: workingEmployees.length
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error'
+        });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
     getUserProfile,
     getUsers,
     updateUser,
-    deleteUser
+    deleteUser,
+    getTotalEmployees,
+    getCurrentlyWorkingEmployees
 };

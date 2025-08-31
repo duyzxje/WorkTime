@@ -4,7 +4,9 @@ const {
     getUserProfile,
     getUsers,
     updateUser,
-    deleteUser
+    deleteUser,
+    getTotalEmployees,
+    getCurrentlyWorkingEmployees
 } = require('../controllers/userController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
@@ -19,6 +21,16 @@ router.post('/', protect, admin, registerUser);
 // @desc    Get all users
 // @access  Private/Admin
 router.get('/', protect, admin, getUsers);
+
+// @route   GET /api/users/count
+// @desc    Get total employees count
+// @access  Private/Admin
+router.get('/count', protect, admin, getTotalEmployees);
+
+// @route   GET /api/users/currently-working
+// @desc    Get currently working employees (checked in but not checked out)
+// @access  Private/Admin
+router.get('/currently-working', protect, admin, getCurrentlyWorkingEmployees);
 
 // @route   GET /api/users/profile
 // @desc    Get user profile
