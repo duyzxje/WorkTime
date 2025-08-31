@@ -127,14 +127,14 @@ const updateLiveEvent = async (req, res) => {
 
         if (!liveEvent) {
             // Create a new live event with all shifts set to false
-            // Field 'off' sẽ được tự động tính toán bởi pre-save middleware
             liveEvent = new Live({
                 day,
                 weekStartDate: startDate,
                 morning: false,
                 noon: false,
                 afternoon: false,
-                evening: false
+                evening: false,
+                off: false
             });
         }
 

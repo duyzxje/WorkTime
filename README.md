@@ -32,15 +32,15 @@ Backend service for employee attendance tracking with GPS validation.
   noon: Boolean,          // Ca trưa
   afternoon: Boolean,     // Ca chiều
   evening: Boolean,       // Ca tối
-  off: Boolean,           // Ca nghỉ (tự động tính toán)
+  off: Boolean,           // Ca nghỉ (được quản lý độc lập)
   timestamps: true
 }
 ```
 
-**Logic tự động:**
-- `off = true` khi tất cả ca khác đều `false`
-- `off = false` khi có ít nhất 1 ca khác là `true`
-- Field `off` được cập nhật tự động trước khi lưu vào database
+**Cách hoạt động:**
+- Field `off` được quản lý độc lập với các ca khác
+- Khi tạo mới, tất cả ca (bao gồm `off`) đều được khởi tạo là `false`
+- Người dùng có thể tự do chọn ca `off` mà không bị ảnh hưởng bởi các ca khác
 
 ### Attendance Schema
 ```javascript
