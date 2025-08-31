@@ -182,22 +182,39 @@ Backend service for employee attendance tracking with GPS validation.
 ### Users
 
 - `GET /api/users` - Get all users (admin only)
+  - Returns: `{ success: true, data: { users: array } }`
+  - Each user includes: id, username, name, email, role
 
 - `GET /api/users/count` - Get total employees count (admin only)
   - Returns: `{ success: true, data: { totalEmployees: number } }`
+  - **Note**: Excludes users with admin role
 
 - `GET /api/users/currently-working` - Get currently working employees (admin only)
   - Returns employees who have checked in but not checked out
   - Returns: `{ success: true, data: { currentlyWorking: array, count: number } }`
+  - **Note**: Excludes users with admin role
 
 - `POST /api/users` - Create a new user (admin only)
   - Required body: `{ username, name, password, email }`
   - Optional body: `{ role }` ("admin", "staff", "viewer")
+  - Validations:
+    - Email format validation
+    - Password minimum 6 characters
+    - Username and email uniqueness
+    - Role validation
 
 - `PUT /api/users/:userId` - Update user (admin only)
   - Optional body: `{ name, role, email, password }`
+  - Validations:
+    - Email format and uniqueness
+    - Role validation
+    - User ID format validation
 
 - `DELETE /api/users/:userId` - Delete user (admin only)
+  - Validations:
+    - User ID format validation
+    - Prevents deleting the last admin user
+    - Returns deleted user information
 
 - `GET /api/users/profile` - Get current user profile
 
@@ -205,6 +222,7 @@ Backend service for employee attendance tracking with GPS validation.
 
 - `POST /api/auth/login` - Authenticate user & get token
   - Required body: `{ username, password }`
+  - Returns: `{ success: true, data: { token: string, user: { id, username, name, email, role } } }`
 
 - `GET /api/auth/verify` - Verify token and get user data
 
@@ -214,14 +232,37 @@ Backend service for employee attendance tracking with GPS validation.
 
 Hệ thống cung cấp thống kê tổng quan cho quản trị viên:
 
-1. **Tổng số nhân viên**: Đếm tổng số người dùng trong hệ thống
+1. **Tổng số nhân viên**: Đếm tổng số người dùng trong hệ thống (loại trừ admin)
    - Endpoint: `GET /api/users/count`
-   - Trả về số lượng nhân viên hiện có
+   - Trả về số lượng nhân viên hiện có (không bao gồm admin)
 
-2. **Nhân viên đang làm việc**: Hiển thị danh sách nhân viên đã check-in nhưng chưa check-out
+2. **Nhân viên đang làm việc**: Hiển thị danh sách nhân viên đã check-in nhưng chưa check-out (loại trừ admin)
    - Endpoint: `GET /api/users/currently-working`
    - Trả về thông tin chi tiết: tên, username, email, thời gian check-in, văn phòng
    - Thời gian được định dạng theo múi giờ Việt Nam
+   - Chỉ hiển thị nhân viên (staff, viewer), không bao gồm admin
+
+### Quản lý người dùng
+
+Hệ thống cung cấp đầy đủ chức năng quản lý người dùng cho quản trị viên:
+
+1. **Tạo người dùng mới** (`POST /api/users`)
+   - Yêu cầu: username, name, email, password
+   - Tùy chọn: role (admin, staff, viewer)
+   - Validation: định dạng email, độ dài mật khẩu, tính duy nhất của username/email
+
+2. **Cập nhật thông tin người dùng** (`PUT /api/users/:userId`)
+   - Có thể cập nhật: name, email, role, password
+   - Validation: định dạng email, tính duy nhất email, định dạng user ID
+
+3. **Xóa người dùng** (`DELETE /api/users/:userId`)
+   - Validation: định dạng user ID
+   - Bảo vệ: không cho phép xóa admin cuối cùng
+   - Trả về thông tin user đã xóa
+
+4. **Xem danh sách người dùng** (`GET /api/users`)
+   - Hiển thị tất cả users (không bao gồm password)
+   - Chỉ admin mới có quyền truy cập
 
 ### Chấm công
 

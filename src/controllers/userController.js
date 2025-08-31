@@ -3,17 +3,51 @@ const generateToken = require('../utils/generateToken');
 
 // @desc    Register a new user
 // @route   POST /api/users
-// @access  Public
+// @access  Private/Admin
 const registerUser = async (req, res) => {
     try {
         const { username, name, email, password, role } = req.body;
 
+        // Validate required fields
+        if (!username || !name || !email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Username, name, email, and password are required'
+            });
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid email format'
+            });
+        }
+
+        // Validate password length
+        if (password.length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password must be at least 6 characters long'
+            });
+        }
+
+        // Validate role if provided
+        if (role && !['admin', 'staff', 'viewer'].includes(role)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid role. Must be admin, staff, or viewer'
+            });
+        }
+
+        // Check if user already exists
         const userExists = await User.findOne({ $or: [{ email }, { username }] });
 
         if (userExists) {
             return res.status(400).json({
                 success: false,
-                message: 'User already exists'
+                message: userExists.email === email ? 'Email already exists' : 'Username already exists'
             });
         }
 
@@ -33,6 +67,7 @@ const registerUser = async (req, res) => {
                         id: user._id,
                         username: user.username,
                         name: user.name,
+                        email: user.email,
                         role: user.role
                     },
                     message: 'Đã tạo người dùng mới thành công'
@@ -45,10 +80,10 @@ const registerUser = async (req, res) => {
             });
         }
     } catch (error) {
-        console.error(error);
+        console.error('Error creating user:', error);
         res.status(500).json({
             success: false,
-            message: 'Server Error'
+            message: 'Server Error: ' + error.message
         });
     }
 };
@@ -71,6 +106,7 @@ const loginUser = async (req, res) => {
                         id: user._id,
                         username: user.username,
                         name: user.name,
+                        email: user.email,
                         role: user.role
                     }
                 }
@@ -134,6 +170,7 @@ const getUsers = async (req, res) => {
             id: user._id,
             username: user.username,
             name: user.name,
+            email: user.email,
             role: user.role
         }));
 
@@ -157,7 +194,18 @@ const getUsers = async (req, res) => {
 // @access  Private/Admin
 const updateUser = async (req, res) => {
     try {
-        const user = await User.findById(req.params.userId);
+        const { userId } = req.params;
+        const { name, email, role, password } = req.body;
+
+        // Validate userId format
+        if (!userId || !require('mongoose').Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID format'
+            });
+        }
+
+        const user = await User.findById(userId);
 
         if (!user) {
             return res.status(404).json({
@@ -166,14 +214,33 @@ const updateUser = async (req, res) => {
             });
         }
 
+        // Validate role if provided
+        if (role && !['admin', 'staff', 'viewer'].includes(role)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid role. Must be admin, staff, or viewer'
+            });
+        }
+
+        // Check if email is already taken by another user
+        if (email && email !== user.email) {
+            const emailExists = await User.findOne({ email, _id: { $ne: userId } });
+            if (emailExists) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email already exists'
+                });
+            }
+        }
+
         // Update fields if provided in request
-        if (req.body.name) user.name = req.body.name;
-        if (req.body.role) user.role = req.body.role;
-        if (req.body.email) user.email = req.body.email;
+        if (name) user.name = name;
+        if (role) user.role = role;
+        if (email) user.email = email;
 
         // Only update password if provided
-        if (req.body.password) {
-            user.password = req.body.password;
+        if (password) {
+            user.password = password;
         }
 
         const updatedUser = await user.save();
@@ -185,16 +252,17 @@ const updateUser = async (req, res) => {
                     id: updatedUser._id,
                     username: updatedUser.username,
                     name: updatedUser.name,
+                    email: updatedUser.email,
                     role: updatedUser.role
                 },
                 message: 'Đã cập nhật thông tin người dùng thành công'
             }
         });
     } catch (error) {
-        console.error(error);
+        console.error('Error updating user:', error);
         res.status(500).json({
             success: false,
-            message: 'Server Error'
+            message: 'Server Error: ' + error.message
         });
     }
 };
@@ -204,7 +272,17 @@ const updateUser = async (req, res) => {
 // @access  Private/Admin
 const deleteUser = async (req, res) => {
     try {
-        const user = await User.findById(req.params.userId);
+        const { userId } = req.params;
+
+        // Validate userId format
+        if (!userId || !require('mongoose').Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID format'
+            });
+        }
+
+        const user = await User.findById(userId);
 
         if (!user) {
             return res.status(404).json({
@@ -213,17 +291,40 @@ const deleteUser = async (req, res) => {
             });
         }
 
-        await user.remove();
+        // Prevent deleting the last admin user
+        if (user.role === 'admin') {
+            const adminCount = await User.countDocuments({ role: 'admin' });
+            if (adminCount <= 1) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Không thể xóa admin cuối cùng trong hệ thống'
+                });
+            }
+        }
+
+        // Delete the user using deleteOne instead of deprecated remove()
+        const deleteResult = await User.deleteOne({ _id: userId });
+
+        if (deleteResult.deletedCount === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found or already deleted'
+            });
+        }
 
         res.json({
             success: true,
-            message: 'Đã xóa người dùng thành công'
+            message: 'Đã xóa người dùng thành công',
+            data: {
+                deletedUserId: userId,
+                deletedUserName: user.name
+            }
         });
     } catch (error) {
-        console.error(error);
+        console.error('Error deleting user:', error);
         res.status(500).json({
             success: false,
-            message: 'Server Error'
+            message: 'Server Error: ' + error.message
         });
     }
 };
@@ -233,7 +334,8 @@ const deleteUser = async (req, res) => {
 // @access  Private/Admin
 const getTotalEmployees = async (req, res) => {
     try {
-        const totalCount = await User.countDocuments({});
+        // Đếm tổng nhân viên loại trừ admin
+        const totalCount = await User.countDocuments({ role: { $ne: 'admin' } });
 
         res.json({
             success: true,
@@ -257,30 +359,36 @@ const getCurrentlyWorkingEmployees = async (req, res) => {
     try {
         const Attendance = require('../models/attendanceModel');
 
-        // Find all users who are currently checked in (status: 'checked-in')
+        // Find all users who are currently checked in (status: 'checked-in') and not admin
         const currentlyWorking = await Attendance.find({ status: 'checked-in' })
-            .populate('user', 'name username email role')
+            .populate({
+                path: 'user',
+                select: 'name username email role',
+                match: { role: { $ne: 'admin' } }
+            })
             .sort('-checkInTime');
 
-        // Format the response
-        const workingEmployees = currentlyWorking.map(attendance => ({
-            userId: attendance.user._id,
-            name: attendance.user.name,
-            username: attendance.user.username,
-            email: attendance.user.email,
-            role: attendance.user.role,
-            checkInTime: attendance.checkInTime,
-            checkInTimeFormatted: new Date(attendance.checkInTime).toLocaleTimeString('vi-VN', {
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZone: 'Asia/Ho_Chi_Minh'
-            }),
-            checkInDateFormatted: new Date(attendance.checkInTime).toLocaleDateString('vi-VN', {
-                timeZone: 'Asia/Ho_Chi_Minh'
-            }),
-            officeId: attendance.officeId,
-            notes: attendance.notes
-        }));
+        // Format the response - filter out null users (admin users)
+        const workingEmployees = currentlyWorking
+            .filter(attendance => attendance.user !== null) // Loại bỏ admin users
+            .map(attendance => ({
+                userId: attendance.user._id,
+                name: attendance.user.name,
+                username: attendance.user.username,
+                email: attendance.user.email,
+                role: attendance.user.role,
+                checkInTime: attendance.checkInTime,
+                checkInTimeFormatted: new Date(attendance.checkInTime).toLocaleTimeString('vi-VN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'Asia/Ho_Chi_Minh'
+                }),
+                checkInDateFormatted: new Date(attendance.checkInTime).toLocaleDateString('vi-VN', {
+                    timeZone: 'Asia/Ho_Chi_Minh'
+                }),
+                officeId: attendance.officeId,
+                notes: attendance.notes
+            }));
 
         res.json({
             success: true,
