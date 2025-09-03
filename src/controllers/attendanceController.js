@@ -3,6 +3,7 @@ const Office = require('../models/officeModel');
 const { isWithinRadius } = require('../utils/geoUtils');
 const { officeLocations } = require('../config/locations'); // Giữ lại để tương thích ngược
 const mongoose = require('mongoose');
+const User = require('../models/userModel'); // Added for getMonthlyAttendanceSummary
 
 // @desc    Check in
 // @route   POST /api/attendance/checkin
@@ -784,6 +785,248 @@ const getAttendanceSummary = async (req, res) => {
     }
 };
 
+// @desc    Get monthly attendance summary for admin (all employees)
+// @route   GET /api/attendance/admin/monthly-summary
+// @access  Private/Admin
+const getMonthlyAttendanceSummary = async (req, res) => {
+    try {
+        const { month, year } = req.query;
+
+        if (!month || !year) {
+            return res.status(400).json({
+                success: false,
+                message: 'Month and year are required'
+            });
+        }
+
+        const monthNum = parseInt(month);
+        const yearNum = parseInt(year);
+
+        if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid month. Month must be between 1 and 12.'
+            });
+        }
+
+        if (isNaN(yearNum)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid year format.'
+            });
+        }
+
+        // Tính ngày đầu và cuối của tháng (UTC+7 Vietnam timezone)
+        const startOfMonth = new Date(Date.UTC(yearNum, monthNum - 1, 1, -7, 0, 0));
+        const endOfMonth = new Date(Date.UTC(yearNum, monthNum, 0, 16, 59, 59));
+
+        // Lấy tất cả users (không bao gồm admin)
+        const users = await User.find({ role: { $ne: 'admin' } }).select('name email username');
+
+        const summary = [];
+
+        for (const user of users) {
+            // Đếm số lần chấm công trong tháng
+            const attendanceCount = await Attendance.countDocuments({
+                user: user._id,
+                checkInTime: { $gte: startOfMonth, $lte: endOfMonth }
+            });
+
+            // Lấy chi tiết chấm công theo từng ngày
+            const dailyAttendance = await Attendance.find({
+                user: user._id,
+                checkInTime: { $gte: startOfMonth, $lte: endOfMonth }
+            }).sort('checkInTime');
+
+            // Tạo bảng dữ liệu cho từng ngày trong tháng
+            const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
+            const dailyRecords = [];
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const currentDate = new Date(Date.UTC(yearNum, monthNum - 1, day, -7, 0, 0));
+                const nextDate = new Date(Date.UTC(yearNum, monthNum - 1, day, 16, 59, 59));
+
+                // Tìm các bản ghi trong ngày này
+                const dayRecords = dailyAttendance.filter(record => {
+                    const recordDate = new Date(record.checkInTime);
+                    return recordDate >= currentDate && recordDate <= nextDate;
+                });
+
+                if (dayRecords.length > 0) {
+                    dailyRecords.push({
+                        date: currentDate.toISOString().split('T')[0],
+                        dayOfWeek: currentDate.getDay(),
+                        records: dayRecords.map(record => ({
+                            id: record._id,
+                            checkInTime: record.checkInTime,
+                            checkInTimeFormatted: new Date(record.checkInTime).toLocaleTimeString('vi-VN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                timeZone: 'Asia/Ho_Chi_Minh'
+                            }),
+                            checkOutTime: record.checkOutTime,
+                            checkOutTimeFormatted: record.checkOutTime ? new Date(record.checkOutTime).toLocaleTimeString('vi-VN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                timeZone: 'Asia/Ho_Chi_Minh'
+                            }) : null,
+                            status: record.status,
+                            workDuration: record.workDuration || 0,
+                            workTimeFormatted: record.workDuration ?
+                                `${Math.floor(record.workDuration / 60)}h${record.workDuration % 60}m` : '0h0m',
+                            officeId: record.officeId,
+                            notes: record.notes,
+                            isValid: record.isValid
+                        }))
+                    });
+                }
+            }
+
+            summary.push({
+                userId: user._id,
+                name: user.name,
+                email: user.email,
+                username: user.username,
+                attendanceCount,
+                dailyRecords
+            });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                month: monthNum,
+                year: yearNum,
+                summary
+            }
+        });
+    } catch (error) {
+        console.error('Error in getMonthlyAttendanceSummary:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error: ' + error.message
+        });
+    }
+};
+
+// @desc    Update attendance record (admin only)
+// @route   PUT /api/attendance/admin/:attendanceId
+// @access  Private/Admin
+const updateAttendanceRecord = async (req, res) => {
+    try {
+        const { attendanceId } = req.params;
+        const { checkInTime, checkOutTime, notes, officeId } = req.body;
+
+        if (!mongoose.Types.ObjectId.isValid(attendanceId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid attendance ID format'
+            });
+        }
+
+        const attendance = await Attendance.findById(attendanceId);
+
+        if (!attendance) {
+            return res.status(404).json({
+                success: false,
+                message: 'Attendance record not found'
+            });
+        }
+
+        // Update fields if provided
+        if (checkInTime) {
+            attendance.checkInTime = new Date(checkInTime);
+        }
+
+        if (checkOutTime) {
+            attendance.checkOutTime = new Date(checkOutTime);
+            attendance.status = 'checked-out';
+
+            // Recalculate work duration
+            if (attendance.checkInTime) {
+                const workDurationMinutes = Math.round(
+                    (attendance.checkOutTime - attendance.checkInTime) / (1000 * 60)
+                );
+                attendance.workDuration = workDurationMinutes;
+            }
+        }
+
+        if (notes !== undefined) {
+            attendance.notes = notes;
+        }
+
+        if (officeId) {
+            attendance.officeId = officeId;
+        }
+
+        const updatedAttendance = await attendance.save();
+
+        res.json({
+            success: true,
+            data: {
+                attendance: updatedAttendance,
+                message: 'Đã cập nhật bản ghi chấm công thành công'
+            }
+        });
+    } catch (error) {
+        console.error('Error updating attendance:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error: ' + error.message
+        });
+    }
+};
+
+// @desc    Delete attendance record (admin only)
+// @route   DELETE /api/attendance/admin/:attendanceId
+// @access  Private/Admin
+const deleteAttendanceRecord = async (req, res) => {
+    try {
+        const { attendanceId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(attendanceId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid attendance ID format'
+            });
+        }
+
+        const attendance = await Attendance.findById(attendanceId);
+
+        if (!attendance) {
+            return res.status(404).json({
+                success: false,
+                message: 'Attendance record not found'
+            });
+        }
+
+        // Delete the attendance record
+        const deleteResult = await Attendance.deleteOne({ _id: attendanceId });
+
+        if (deleteResult.deletedCount === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Attendance record not found or already deleted'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Đã xóa bản ghi chấm công thành công',
+            data: {
+                deletedAttendanceId: attendanceId,
+                deletedUserName: attendance.user
+            }
+        });
+    } catch (error) {
+        console.error('Error deleting attendance:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error: ' + error.message
+        });
+    }
+};
+
 module.exports = {
     checkIn,
     checkOut,
@@ -791,5 +1034,8 @@ module.exports = {
     getAllAttendance,
     manualCheckOut,
     createManualRecord,
-    getAttendanceSummary
+    getAttendanceSummary,
+    getMonthlyAttendanceSummary,
+    updateAttendanceRecord,
+    deleteAttendanceRecord
 };

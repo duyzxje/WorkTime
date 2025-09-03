@@ -119,6 +119,59 @@ Backend service for employee attendance tracking with GPS validation.
 - `GET /api/attendance/all` - Get all users' attendance (admin only)
   - Optional query params: `startDate, endDate, userId`
 
+### Admin Attendance Management
+
+- `GET /api/attendance/admin/monthly-summary` - Get monthly attendance summary for all employees (admin only)
+  - Required query params: `month` (1-12), `year`
+  - Returns: Summary with employee names, emails, attendance counts, and daily records
+  - Response format:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "month": 12,
+        "year": 2024,
+        "summary": [
+          {
+            "userId": "user_id",
+            "name": "Employee Name",
+            "email": "employee@example.com",
+            "username": "username",
+            "attendanceCount": 22,
+            "dailyRecords": [
+              {
+                "date": "2024-12-01",
+                "dayOfWeek": 0,
+                "records": [
+                  {
+                    "id": "attendance_id",
+                    "checkInTime": "2024-12-01T08:00:00.000Z",
+                    "checkInTimeFormatted": "08:00",
+                    "checkOutTime": "2024-12-01T17:00:00.000Z",
+                    "checkOutTimeFormatted": "17:00",
+                    "status": "checked-out",
+                    "workDuration": 540,
+                    "workTimeFormatted": "9h0m",
+                    "officeId": "main",
+                    "notes": "Working day",
+                    "isValid": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+    ```
+  
+- `PUT /api/attendance/admin/:attendanceId` - Update attendance record (admin only)
+  - Optional body: `{ checkInTime, checkOutTime, notes, officeId }`
+  - Automatically recalculates work duration if check-out time is updated
+  
+- `DELETE /api/attendance/admin/:attendanceId` - Delete attendance record (admin only)
+  - Permanently removes the attendance record
+
 ### Offices
 
 - `GET /api/offices` - Get all office locations
@@ -263,6 +316,30 @@ Hệ thống cung cấp đầy đủ chức năng quản lý người dùng cho 
 4. **Xem danh sách người dùng** (`GET /api/users`)
    - Hiển thị tất cả users (không bao gồm password)
    - Chỉ admin mới có quyền truy cập
+
+### Quản lý chấm công (Admin)
+
+Hệ thống cung cấp chức năng quản lý chấm công toàn diện cho quản trị viên:
+
+1. **Tổng quan chấm công theo tháng** (`GET /api/attendance/admin/monthly-summary`)
+   - Hiển thị tất cả nhân viên (không bao gồm admin)
+   - Thông tin: tên, email, username, số lần chấm công trong tháng
+   - Chi tiết chấm công theo từng ngày trong tháng
+   - Mỗi ngày hiển thị: giờ check-in/check-out, thời gian làm việc, văn phòng, ghi chú
+
+2. **Chỉnh sửa bản ghi chấm công** (`PUT /api/attendance/admin/:attendanceId`)
+   - Có thể cập nhật: giờ check-in, giờ check-out, ghi chú, văn phòng
+   - Tự động tính lại thời gian làm việc khi cập nhật giờ check-out
+   - Cập nhật trạng thái thành "checked-out" nếu có giờ check-out
+
+3. **Xóa bản ghi chấm công** (`DELETE /api/attendance/admin/:attendanceId`)
+   - Xóa vĩnh viễn bản ghi chấm công
+   - Trả về thông tin bản ghi đã xóa
+
+4. **Tính năng bổ sung**
+   - Thời gian được định dạng theo múi giờ Việt Nam
+   - Hiển thị thời gian làm việc theo format giờ:phút
+   - Sắp xếp theo thứ tự thời gian
 
 ### Chấm công
 

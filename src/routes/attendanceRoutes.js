@@ -6,32 +6,29 @@ const {
     getAllAttendance,
     manualCheckOut,
     createManualRecord,
-    getAttendanceSummary
+    getAttendanceSummary,
+    getMonthlyAttendanceSummary,
+    updateAttendanceRecord,
+    deleteAttendanceRecord
 } = require('../controllers/attendanceController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-// Check in - không cần authentication middleware
+// Public routes
 router.post('/checkin', checkIn);
-
-// Check out - không cần authentication middleware
 router.post('/checkout', checkOut);
-
-// Manual check-out (quên check-out)
 router.post('/manual-checkout', manualCheckOut);
-
-// Create manual attendance record (admin only)
-router.post('/manual-record', protect, admin, createManualRecord);
-
-// QUAN TRỌNG: Route cụ thể phải đặt TRƯỚC route có tham số
-// Get attendance for all users (vẫn giữ lại bảo vệ admin)
-router.get('/all', protect, admin, getAllAttendance);
-
-// Get attendance summary by month for a user
+router.get('/:userId', getAttendanceHistory);
 router.get('/:userId/summary', getAttendanceSummary);
 
-// Get user's attendance history - theo userId (PHẢI ĐỂ Ở CUỐI CÙNG!)
-router.get('/:userId', getAttendanceHistory);
+// Admin only routes
+router.get('/all', protect, admin, getAllAttendance);
+router.post('/manual-record', protect, admin, createManualRecord);
+
+// New admin attendance management routes
+router.get('/admin/monthly-summary', protect, admin, getMonthlyAttendanceSummary);
+router.put('/admin/:attendanceId', protect, admin, updateAttendanceRecord);
+router.delete('/admin/:attendanceId', protect, admin, deleteAttendanceRecord);
 
 module.exports = router;
