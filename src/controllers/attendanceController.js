@@ -324,25 +324,21 @@ const getAttendanceHistory = async (req, res) => {
                 attendance.workTimeFormatted = `${hours}h${minutes}m`;
             }
 
-            // Định dạng thời gian check-in/check-out thân thiện (đã được lưu theo múi giờ VN)
+            // Định dạng thời gian check-in/check-out (trả về đúng thời gian đã lưu trong DB)
             if (attendance.checkInTime) {
                 const checkInDate = new Date(attendance.checkInTime);
                 attendance.checkInTimeFormatted = checkInDate.toLocaleTimeString('vi-VN', {
                     hour: '2-digit',
-                    minute: '2-digit',
-                    timeZone: 'Asia/Ho_Chi_Minh'
+                    minute: '2-digit'
                 });
-                attendance.checkInDateFormatted = checkInDate.toLocaleDateString('vi-VN', {
-                    timeZone: 'Asia/Ho_Chi_Minh'
-                });
+                attendance.checkInDateFormatted = checkInDate.toLocaleDateString('vi-VN');
             }
 
             if (attendance.checkOutTime) {
                 const checkOutDate = new Date(attendance.checkOutTime);
                 attendance.checkOutTimeFormatted = checkOutDate.toLocaleTimeString('vi-VN', {
                     hour: '2-digit',
-                    minute: '2-digit',
-                    timeZone: 'Asia/Ho_Chi_Minh'
+                    minute: '2-digit'
                 });
             }
 
@@ -678,13 +674,12 @@ const getAttendanceSummary = async (req, res) => {
                     records: dayRecords.map(record => {
                         const recordObj = record.toObject();
 
-                        // Định dạng giờ check-in/check-out
+                        // Định dạng giờ check-in/check-out (trả về đúng thời gian đã lưu trong DB)
                         if (recordObj.checkInTime) {
                             recordObj.checkInTimeFormatted = new Date(recordObj.checkInTime)
                                 .toLocaleTimeString('vi-VN', {
                                     hour: '2-digit',
-                                    minute: '2-digit',
-                                    timeZone: 'Asia/Ho_Chi_Minh'
+                                    minute: '2-digit'
                                 });
                         }
 
@@ -692,8 +687,7 @@ const getAttendanceSummary = async (req, res) => {
                             recordObj.checkOutTimeFormatted = new Date(recordObj.checkOutTime)
                                 .toLocaleTimeString('vi-VN', {
                                     hour: '2-digit',
-                                    minute: '2-digit',
-                                    timeZone: 'Asia/Ho_Chi_Minh'
+                                    minute: '2-digit'
                                 });
 
                             // Cập nhật thời gian làm việc
@@ -762,16 +756,14 @@ const getAttendanceSummary = async (req, res) => {
                 time: earliestCheckIn,
                 formatted: new Date(earliestCheckIn).toLocaleTimeString('vi-VN', {
                     hour: '2-digit',
-                    minute: '2-digit',
-                    timeZone: 'Asia/Ho_Chi_Minh'
+                    minute: '2-digit'
                 })
             } : null,
             latestCheckOut: latestCheckOut ? {
                 time: latestCheckOut,
                 formatted: new Date(latestCheckOut).toLocaleTimeString('vi-VN', {
                     hour: '2-digit',
-                    minute: '2-digit',
-                    timeZone: 'Asia/Ho_Chi_Minh'
+                    minute: '2-digit'
                 })
             } : null,
             incompleteRecords,
@@ -861,14 +853,12 @@ const getMonthlyAttendanceSummary = async (req, res) => {
                             checkInTime: record.checkInTime,
                             checkInTimeFormatted: new Date(record.checkInTime).toLocaleTimeString('vi-VN', {
                                 hour: '2-digit',
-                                minute: '2-digit',
-                                timeZone: 'Asia/Ho_Chi_Minh'
+                                minute: '2-digit'
                             }),
                             checkOutTime: record.checkOutTime,
                             checkOutTimeFormatted: record.checkOutTime ? new Date(record.checkOutTime).toLocaleTimeString('vi-VN', {
                                 hour: '2-digit',
-                                minute: '2-digit',
-                                timeZone: 'Asia/Ho_Chi_Minh'
+                                minute: '2-digit'
                             }) : null,
                             status: record.status,
                             workDuration: record.workDuration || 0,

@@ -380,12 +380,9 @@ const getCurrentlyWorkingEmployees = async (req, res) => {
                 checkInTime: attendance.checkInTime,
                 checkInTimeFormatted: new Date(attendance.checkInTime).toLocaleTimeString('vi-VN', {
                     hour: '2-digit',
-                    minute: '2-digit',
-                    timeZone: 'Asia/Ho_Chi_Minh'
+                    minute: '2-digit'
                 }),
-                checkInDateFormatted: new Date(attendance.checkInTime).toLocaleDateString('vi-VN', {
-                    timeZone: 'Asia/Ho_Chi_Minh'
-                }),
+                checkInDateFormatted: new Date(attendance.checkInTime).toLocaleDateString('vi-VN'),
                 officeId: attendance.officeId,
                 notes: attendance.notes
             }));
