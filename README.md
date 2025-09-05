@@ -271,6 +271,39 @@ Backend service for employee attendance tracking with GPS validation.
 
 - `GET /api/users/profile` - Get current user profile
 
+### Salary Management
+
+- `POST /api/salary/calculate` - Calculate salary for a user in a specific month
+  - Required body: `{ userId, month, year }`
+  - Returns: Detailed salary calculation with daily records and totals
+  - Calculates based on attendance records and hourly rate
+  - **Frontend Usage**: Gọi API này khi user bấm nút "Tính lương" trong giao diện
+
+- `GET /api/salary/user/:userId` - Get salary history for a user
+  - Optional query: `year` to filter by specific year
+  - Returns: Complete salary history for the user
+
+- `GET /api/salary/monthly` - Get all salaries for a specific month
+  - Required query: `month`, `year`
+  - Returns: All employee salaries for the month with summary totals
+
+- `GET /api/salary/export/:userId/:month/:year` - Export salary report to Excel
+  - Downloads Excel file with 2 sheets:
+    - "Lịch sử chấm công": Daily attendance records
+    - "Tổng kết": Summary with totals and averages
+
+- `PUT /api/salary/rate/:userId` - Update user hourly rate
+  - Required body: `{ hourlyRate }`
+  - Updates the hourly rate for salary calculations
+
+- `GET /api/salary/users` - Get users available for salary calculation
+  - Returns: List of all non-admin users with their hourly rates
+  - **Frontend Usage**: Sử dụng để hiển thị dropdown chọn nhân viên khi tính lương
+
+- `POST /api/salary/recalculate-month` - Recalculate all salaries for a specific month
+  - Required body: `{ month, year }`
+  - **Frontend Usage**: Sử dụng để tính lại lương cho tất cả nhân viên trong tháng
+
 ### Authentication
 
 - `POST /api/auth/login` - Authenticate user & get token
@@ -340,6 +373,36 @@ Hệ thống cung cấp chức năng quản lý chấm công toàn diện cho qu
    - Thời gian được định dạng theo múi giờ Việt Nam
    - Hiển thị thời gian làm việc theo format giờ:phút
    - Sắp xếp theo thứ tự thời gian
+
+### Hệ thống tính lương
+
+Hệ thống cung cấp tính năng tính lương toàn diện dựa trên dữ liệu chấm công:
+
+1. **Cấu hình mức lương**
+   - Mỗi nhân viên có mức lương theo giờ có thể tùy chỉnh (mặc định: 27,000đ/h)
+   - Admin có thể cập nhật mức lương cho từng nhân viên
+
+2. **Tính lương theo tháng**
+   - Tự động tính lương dựa trên dữ liệu chấm công đã hoàn thành (checked-out)
+   - Tính tổng số giờ làm việc và tổng lương cho từng ngày
+   - Lưu trữ lịch sử tính lương để tra cứu
+
+3. **Báo cáo Excel**
+   - Xuất báo cáo lương chi tiết với 2 sheet:
+     - **Lịch sử chấm công**: Chi tiết từng ngày (ngày, giờ vào/ra, số giờ, lương ngày)
+     - **Tổng kết**: Thông tin tổng hợp (tên, mức lương/giờ, tổng giờ, tổng lương)
+
+4. **API quản lý lương**
+   - Tính lương cho nhân viên theo tháng
+   - Xem lịch sử lương của nhân viên
+   - Xem tổng hợp lương theo tháng
+   - Cập nhật mức lương theo giờ
+
+5. **Tính lương tự động**
+   - **Tự động tính lương khi checkout**: Khi nhân viên checkout, hệ thống tự động tính và lưu lương vào database
+   - **Tự động tính lại khi thay đổi mức lương**: Khi admin thay đổi mức lương, hệ thống tự động tính lại lương từ tháng hiện tại
+   - **Theo tháng**: Mỗi tháng có mức lương riêng, thay đổi mức lương chỉ ảnh hưởng từ tháng được áp dụng
+   - **Lưu trữ tự động**: Tất cả tính toán được lưu vào database để tra cứu
 
 ### Chấm công
 

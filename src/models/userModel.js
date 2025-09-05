@@ -31,6 +31,11 @@ const userSchema = mongoose.Schema(
             enum: ['admin', 'staff', 'viewer'],
             default: 'staff',
         },
+        hourlyRate: {
+            type: Number,
+            default: 27000, // Mặc định 27,000đ/h
+            min: 0
+        },
     },
     {
         timestamps: true,

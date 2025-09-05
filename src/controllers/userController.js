@@ -1,5 +1,6 @@
 const User = require('../models/userModel');
 const generateToken = require('../utils/generateToken');
+const { handleSalaryRateChange } = require('../services/autoSalaryService');
 
 // @desc    Register a new user
 // @route   POST /api/users
@@ -195,7 +196,7 @@ const getUsers = async (req, res) => {
 const updateUser = async (req, res) => {
     try {
         const { userId } = req.params;
-        const { name, email, role, password } = req.body;
+        const { name, email, role, password, hourlyRate } = req.body;
 
         // Validate userId format
         if (!userId || !require('mongoose').Types.ObjectId.isValid(userId)) {
@@ -237,6 +238,7 @@ const updateUser = async (req, res) => {
         if (name) user.name = name;
         if (role) user.role = role;
         if (email) user.email = email;
+        if (hourlyRate !== undefined) user.hourlyRate = hourlyRate;
 
         // Only update password if provided
         if (password) {
@@ -244,6 +246,11 @@ const updateUser = async (req, res) => {
         }
 
         const updatedUser = await user.save();
+
+        // Tự động tính lại lương nếu có thay đổi mức lương
+        if (hourlyRate !== undefined && hourlyRate !== user.hourlyRate) {
+            handleSalaryRateChange(userId, hourlyRate);
+        }
 
         res.json({
             success: true,
@@ -253,7 +260,8 @@ const updateUser = async (req, res) => {
                     username: updatedUser.username,
                     name: updatedUser.name,
                     email: updatedUser.email,
-                    role: updatedUser.role
+                    role: updatedUser.role,
+                    hourlyRate: updatedUser.hourlyRate
                 },
                 message: 'Đã cập nhật thông tin người dùng thành công'
             }

@@ -4,6 +4,7 @@ const { isWithinRadius } = require('../utils/geoUtils');
 const { officeLocations } = require('../config/locations'); // Giữ lại để tương thích ngược
 const mongoose = require('mongoose');
 const User = require('../models/userModel'); // Added for getMonthlyAttendanceSummary
+const { handleNewCheckout } = require('../services/autoSalaryService');
 
 // @desc    Check in
 // @route   POST /api/attendance/checkin
@@ -231,6 +232,9 @@ const checkOut = async (req, res) => {
         }
 
         await attendance.save();
+
+        // Tự động tính lương khi có checkout mới
+        handleNewCheckout(attendance);
 
         // Tính thời gian làm việc theo format giờ:phút
         const hours = Math.floor(workDurationMinutes / 60);
@@ -478,6 +482,9 @@ const manualCheckOut = async (req, res) => {
 
         await attendance.save();
 
+        // Tự động tính lương khi có checkout mới
+        handleNewCheckout(attendance);
+
         // Tính thời gian làm việc theo format giờ:phút
         const hours = Math.floor(workDurationMinutes / 60);
         const minutes = workDurationMinutes % 60;
@@ -569,6 +576,11 @@ const createManualRecord = async (req, res) => {
 
         // Tạo bản ghi mới
         const attendance = await Attendance.create(attendanceData);
+
+        // Tự động tính lương nếu có checkout
+        if (attendanceData.status === 'checked-out') {
+            handleNewCheckout(attendance);
+        }
 
         res.status(201).json({
             message: 'Đã tạo bản ghi chấm công thủ công thành công',
@@ -950,6 +962,11 @@ const updateAttendanceRecord = async (req, res) => {
         }
 
         const updatedAttendance = await attendance.save();
+
+        // Tự động tính lại lương nếu có thay đổi checkout
+        if (checkOutTime && updatedAttendance.status === 'checked-out') {
+            handleNewCheckout(updatedAttendance);
+        }
 
         res.json({
             success: true,
