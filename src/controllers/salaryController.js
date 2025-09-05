@@ -2,7 +2,7 @@ const Salary = require('../models/salaryModel');
 const Attendance = require('../models/attendanceModel');
 const User = require('../models/userModel');
 const ExcelJS = require('exceljs');
-const { handleSalaryRateChange, recalculateAllSalariesForMonth } = require('../services/autoSalaryService');
+const { handleSalaryRateChange, updateSalaryForSpecificMonth, recalculateAllSalariesForMonth } = require('../services/autoSalaryService');
 
 // @desc    Calculate salary for a user in a specific month
 // @route   POST /api/salary/calculate
@@ -302,18 +302,11 @@ const exportSalaryToExcel = async (req, res) => {
 
         summarySheet.addRows([
             { info: 'Tên nhân viên', value: salaryRecord.userId.name },
-            { info: 'Username', value: salaryRecord.userId.username },
-            { info: 'Email', value: salaryRecord.userId.email },
             { info: 'Tháng', value: `${monthNames[month - 1]} ${year}` },
             { info: 'Mức lương/giờ', value: salaryRecord.hourlyRate.toLocaleString('vi-VN') + 'đ' },
             { info: 'Tổng số ngày làm', value: salaryRecord.dailyRecords.length },
             { info: 'Tổng số giờ làm', value: salaryRecord.totalHours + ' giờ' },
-            { info: 'Tổng lương', value: salaryRecord.totalSalary.toLocaleString('vi-VN') + 'đ' },
-            {
-                info: 'Lương trung bình/ngày', value: salaryRecord.dailyRecords.length > 0
-                    ? Math.round(salaryRecord.totalSalary / salaryRecord.dailyRecords.length).toLocaleString('vi-VN') + 'đ'
-                    : '0đ'
-            }
+            { info: 'Tổng lương', value: salaryRecord.totalSalary.toLocaleString('vi-VN') + 'đ' }
         ]);
 
         // Style the summary sheet
@@ -326,7 +319,20 @@ const exportSalaryToExcel = async (req, res) => {
 
         // Set response headers
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="luong_${salaryRecord.userId.username}_${month}_${year}.xlsx"`);
+        // Tạo tên file với tên nhân viên (loại bỏ dấu và khoảng trắng)
+        const cleanName = salaryRecord.userId.name
+            .toLowerCase()
+            .replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, 'a')
+            .replace(/[èéẹẻẽêềếệểễ]/g, 'e')
+            .replace(/[ìíịỉĩ]/g, 'i')
+            .replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, 'o')
+            .replace(/[ùúụủũưừứựửữ]/g, 'u')
+            .replace(/[ỳýỵỷỹ]/g, 'y')
+            .replace(/đ/g, 'd')
+            .replace(/\s+/g, '_')
+            .replace(/[^a-z0-9_]/g, '');
+
+        res.setHeader('Content-Disposition', `attachment; filename="luong_${cleanName}_thang${month}_${year}.xlsx"`);
 
         // Write to response
         await workbook.xlsx.write(res);
@@ -458,6 +464,84 @@ const recalculateMonth = async (req, res) => {
     }
 };
 
+// @desc    Update salary for a specific month with new hourly rate
+// @route   PUT /api/salary/update-month
+// @access  Private/Admin
+const updateSalaryForMonth = async (req, res) => {
+    try {
+        const { userId, month, year, hourlyRate } = req.body;
+
+        if (!userId || !month || !year || !hourlyRate) {
+            return res.status(400).json({
+                success: false,
+                message: 'User ID, month, year, and hourly rate are required'
+            });
+        }
+
+        if (month < 1 || month > 12) {
+            return res.status(400).json({
+                success: false,
+                message: 'Month must be between 1 and 12'
+            });
+        }
+
+        if (hourlyRate < 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Hourly rate must be positive'
+            });
+        }
+
+        // Kiểm tra user tồn tại
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Cập nhật lương cho tháng cụ thể
+        const salaryRecord = await updateSalaryForSpecificMonth(userId, month, year, hourlyRate);
+
+        if (!salaryRecord) {
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to update salary for the specified month'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `Đã cập nhật lương cho ${user.name} - tháng ${month}/${year}`,
+            data: {
+                salary: salaryRecord,
+                user: {
+                    id: user._id,
+                    name: user.name,
+                    username: user.username,
+                    email: user.email
+                },
+                summary: {
+                    month,
+                    year,
+                    monthName: new Date(year, month - 1, 1).toLocaleString('vi-VN', { month: 'long' }),
+                    hourlyRate,
+                    totalHours: salaryRecord.totalHours,
+                    totalSalary: salaryRecord.totalSalary,
+                    dailyRecordsCount: salaryRecord.dailyRecords.length
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error in updateSalaryForMonth:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error: ' + error.message
+        });
+    }
+};
+
 module.exports = {
     calculateSalary,
     getUserSalaryHistory,
@@ -465,5 +549,6 @@ module.exports = {
     exportSalaryToExcel,
     updateHourlyRate,
     getUsersForSalary,
-    recalculateMonth
+    recalculateMonth,
+    updateSalaryForMonth
 };

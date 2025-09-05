@@ -304,6 +304,10 @@ Backend service for employee attendance tracking with GPS validation.
   - Required body: `{ month, year }`
   - **Frontend Usage**: Sử dụng để tính lại lương cho tất cả nhân viên trong tháng
 
+- `PUT /api/salary/update-month` - Update salary for a specific month with new hourly rate
+  - Required body: `{ userId, month, year, hourlyRate }`
+  - **Frontend Usage**: Sử dụng để cập nhật lương cho tháng cụ thể của nhân viên
+
 ### Authentication
 
 - `POST /api/auth/login` - Authenticate user & get token
@@ -400,9 +404,10 @@ Hệ thống cung cấp tính năng tính lương toàn diện dựa trên dữ 
 
 5. **Tính lương tự động**
    - **Tự động tính lương khi checkout**: Khi nhân viên checkout, hệ thống tự động tính và lưu lương vào database
-   - **Tự động tính lại khi thay đổi mức lương**: Khi admin thay đổi mức lương, hệ thống tự động tính lại lương từ tháng hiện tại
-   - **Theo tháng**: Mỗi tháng có mức lương riêng, thay đổi mức lương chỉ ảnh hưởng từ tháng được áp dụng
-   - **Lưu trữ tự động**: Tất cả tính toán được lưu vào database để tra cứu
+   - **Mức lương cố định**: Mỗi user có mức lương cố định lưu trong User model
+   - **Không tự động thay đổi lương cũ**: Khi thay đổi mức lương chung, các tháng đã tính lương không tự động thay đổi
+   - **Cập nhật tháng cụ thể**: Admin có thể cập nhật lương cho tháng cụ thể thông qua API
+   - **Lưu trữ theo tháng**: Mỗi tháng có record lương riêng với mức lương áp dụng cho tháng đó
 
 ### Chấm công
 

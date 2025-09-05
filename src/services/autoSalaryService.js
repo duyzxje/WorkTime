@@ -125,40 +125,38 @@ const handleNewCheckout = async (attendanceRecord) => {
 };
 
 /**
- * Tự động tính lại lương khi thay đổi mức lương
+ * Cập nhật lương cho tháng cụ thể (không tự động khi thay đổi mức lương chung)
  * @param {string} userId - ID của nhân viên
- * @param {number} newHourlyRate - Mức lương mới
- * @param {number} fromMonth - Tháng bắt đầu áp dụng (optional)
- * @param {number} fromYear - Năm bắt đầu áp dụng (optional)
+ * @param {number} month - Tháng
+ * @param {number} year - Năm
+ * @param {number} newHourlyRate - Mức lương mới cho tháng đó
  */
-const handleSalaryRateChange = async (userId, newHourlyRate, fromMonth = null, fromYear = null) => {
+const updateSalaryForSpecificMonth = async (userId, month, year, newHourlyRate) => {
     try {
-        console.log(`[Auto Salary] Hourly rate changed for user ${userId} to ${newHourlyRate}đ/h`);
+        console.log(`[Auto Salary] Updating salary for user ${userId}, month ${month}/${year} with rate ${newHourlyRate}đ/h`);
 
-        // Nếu không chỉ định tháng/năm, tính lại từ tháng hiện tại
-        if (!fromMonth || !fromYear) {
-            const now = new Date();
-            fromMonth = now.getMonth() + 1;
-            fromYear = now.getFullYear();
+        const salaryRecord = await calculateMonthlySalary(userId, month, year, newHourlyRate);
+        if (salaryRecord) {
+            console.log(`[Auto Salary] Updated salary for ${month}/${year}: ${salaryRecord.totalSalary}đ`);
+            return salaryRecord;
         }
+        return null;
+    } catch (error) {
+        console.error('[Auto Salary] Error updating salary for specific month:', error);
+        return null;
+    }
+};
 
-        // Tính lại lương cho tháng hiện tại và các tháng sau
-        const currentDate = new Date();
-        const currentMonth = currentDate.getMonth() + 1;
-        const currentYear = currentDate.getFullYear();
-
-        // Tính lại từ tháng được chỉ định đến tháng hiện tại
-        for (let year = fromYear; year <= currentYear; year++) {
-            const startMonth = (year === fromYear) ? fromMonth : 1;
-            const endMonth = (year === currentYear) ? currentMonth : 12;
-
-            for (let month = startMonth; month <= endMonth; month++) {
-                const salaryRecord = await calculateMonthlySalary(userId, month, year, newHourlyRate);
-                if (salaryRecord) {
-                    console.log(`[Auto Salary] Recalculated salary for ${month}/${year}: ${salaryRecord.totalSalary}đ`);
-                }
-            }
-        }
+/**
+ * Lưu ý: Không tự động tính lại lương khi thay đổi mức lương chung
+ * Chỉ tính lương mới khi có checkout mới
+ */
+const handleSalaryRateChange = async (userId, newHourlyRate) => {
+    try {
+        console.log(`[Auto Salary] Hourly rate changed for user ${userId} to ${newHourlyRate}đ/h - No automatic recalculation`);
+        console.log(`[Auto Salary] New checkouts will use the new rate: ${newHourlyRate}đ/h`);
+        // Không tự động tính lại lương cũ
+        // Chỉ áp dụng mức lương mới cho các checkout mới
     } catch (error) {
         console.error('[Auto Salary] Error handling salary rate change:', error);
     }
@@ -193,5 +191,6 @@ module.exports = {
     calculateMonthlySalary,
     handleNewCheckout,
     handleSalaryRateChange,
+    updateSalaryForSpecificMonth,
     recalculateAllSalariesForMonth
 };

@@ -7,7 +7,8 @@ const {
     exportSalaryToExcel,
     updateHourlyRate,
     getUsersForSalary,
-    recalculateMonth
+    recalculateMonth,
+    updateSalaryForMonth
 } = require('../controllers/salaryController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
@@ -45,5 +46,10 @@ router.get('/users', protect, admin, getUsersForSalary);
 // @desc    Recalculate all salaries for a specific month
 // @access  Private/Admin
 router.post('/recalculate-month', protect, admin, recalculateMonth);
+
+// @route   PUT /api/salary/update-month
+// @desc    Update salary for a specific month with new hourly rate
+// @access  Private/Admin
+router.put('/update-month', protect, admin, updateSalaryForMonth);
 
 module.exports = router;
