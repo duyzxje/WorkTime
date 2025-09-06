@@ -830,7 +830,7 @@ const getMonthlyAttendanceSummary = async (req, res) => {
         const summary = [];
 
         for (const user of users) {
-            // Lấy chi tiết chấm công theo từng ngày
+            Á            // Lấy chi tiết chấm công theo từng ngày
             const dailyAttendance = await Attendance.find({
                 user: user._id,
                 checkInTime: { $gte: startOfMonth, $lte: endOfMonth }

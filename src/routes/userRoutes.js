@@ -3,6 +3,7 @@ const {
     registerUser,
     getUserProfile,
     getUsers,
+    getUserById,
     updateUser,
     deleteUser,
     getTotalEmployees,
@@ -36,6 +37,11 @@ router.get('/currently-working', protect, admin, getCurrentlyWorkingEmployees);
 // @desc    Get user profile
 // @access  Private
 router.get('/profile', protect, getUserProfile);
+
+// @route   GET /api/users/:userId
+// @desc    Get user by ID
+// @access  Private/Admin
+router.get('/:userId', protect, admin, getUserById);
 
 // @route   PUT /api/users/:userId
 // @desc    Update user information

@@ -236,7 +236,7 @@ Backend service for employee attendance tracking with GPS validation.
 
 - `GET /api/users` - Get all users (admin only)
   - Returns: `{ success: true, data: { users: array } }`
-  - Each user includes: id, username, name, email, role
+  - Each user includes: id, username, name, email, role, hourlyRate
 
 - `GET /api/users/count` - Get total employees count (admin only)
   - Returns: `{ success: true, data: { totalEmployees: number } }`
@@ -245,6 +245,7 @@ Backend service for employee attendance tracking with GPS validation.
 - `GET /api/users/currently-working` - Get currently working employees (admin only)
   - Returns employees who have checked in but not checked out
   - Returns: `{ success: true, data: { currentlyWorking: array, count: number } }`
+  - Each employee includes: userId, name, username, email, role, hourlyRate, checkInTime, checkInTimeFormatted, checkInDateFormatted, officeId, notes
   - **Note**: Excludes users with admin role
 
 - `POST /api/users` - Create a new user (admin only)
@@ -270,6 +271,10 @@ Backend service for employee attendance tracking with GPS validation.
     - Returns deleted user information
 
 - `GET /api/users/profile` - Get current user profile
+  - Returns: `{ success: true, data: { id, username, name, email, role, hourlyRate } }`
+
+- `GET /api/users/:userId` - Get user by ID (admin only)
+  - Returns: `{ success: true, data: { id, username, name, email, role, hourlyRate, createdAt, updatedAt } }`
 
 ### Salary Management
 
@@ -353,6 +358,12 @@ Hệ thống cung cấp đầy đủ chức năng quản lý người dùng cho 
 
 4. **Xem danh sách người dùng** (`GET /api/users`)
    - Hiển thị tất cả users (không bao gồm password)
+   - Bao gồm thông tin lương mặc định (hourlyRate)
+   - Chỉ admin mới có quyền truy cập
+
+5. **Xem thông tin chi tiết người dùng** (`GET /api/users/:userId`)
+   - Hiển thị thông tin chi tiết của một user cụ thể
+   - Bao gồm lương mặc định và thời gian tạo/cập nhật
    - Chỉ admin mới có quyền truy cập
 
 ### Quản lý chấm công (Admin)

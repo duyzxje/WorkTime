@@ -143,6 +143,7 @@ const getUserProfile = async (req, res) => {
                     name: user.name,
                     email: user.email,
                     role: user.role,
+                    hourlyRate: user.hourlyRate
                 }
             });
         } else {
@@ -172,7 +173,8 @@ const getUsers = async (req, res) => {
             username: user.username,
             name: user.name,
             email: user.email,
-            role: user.role
+            role: user.role,
+            hourlyRate: user.hourlyRate
         }));
 
         res.json({
@@ -371,7 +373,7 @@ const getCurrentlyWorkingEmployees = async (req, res) => {
         const currentlyWorking = await Attendance.find({ status: 'checked-in' })
             .populate({
                 path: 'user',
-                select: 'name username email role',
+                select: 'name username email role hourlyRate',
                 match: { role: { $ne: 'admin' } }
             })
             .sort('-checkInTime');
@@ -385,6 +387,7 @@ const getCurrentlyWorkingEmployees = async (req, res) => {
                 username: attendance.user.username,
                 email: attendance.user.email,
                 role: attendance.user.role,
+                hourlyRate: attendance.user.hourlyRate,
                 checkInTime: attendance.checkInTime,
                 checkInTimeFormatted: new Date(attendance.checkInTime).toLocaleTimeString('vi-VN', {
                     hour: '2-digit',
@@ -411,11 +414,50 @@ const getCurrentlyWorkingEmployees = async (req, res) => {
     }
 };
 
+// @desc    Get user by ID
+// @route   GET /api/users/:userId
+// @access  Private/Admin
+const getUserById = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const user = await User.findById(userId).select('-password');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                id: user._id,
+                username: user.username,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                hourlyRate: user.hourlyRate,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt
+            }
+        });
+    } catch (error) {
+        console.error('Error getting user by ID:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error: ' + error.message
+        });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
     getUserProfile,
     getUsers,
+    getUserById,
     updateUser,
     deleteUser,
     getTotalEmployees,
