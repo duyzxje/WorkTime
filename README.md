@@ -276,7 +276,7 @@ Backend service for employee attendance tracking with GPS validation.
 - `POST /api/salary/calculate` - Calculate salary for a user in a specific month
   - Required body: `{ userId, month, year }`
   - Returns: Detailed salary calculation with daily records and totals
-  - Calculates based on attendance records and hourly rate
+  - **Sử dụng lương mặc định** từ User.hourlyRate để tính lương
   - **Frontend Usage**: Gọi API này khi user bấm nút "Tính lương" trong giao diện
 
 - `GET /api/salary/user/:userId` - Get salary history for a user
@@ -306,7 +306,8 @@ Backend service for employee attendance tracking with GPS validation.
 
 - `PUT /api/salary/update-month` - Update salary for a specific month with new hourly rate
   - Required body: `{ userId, month, year, hourlyRate }`
-  - **Frontend Usage**: Sử dụng để cập nhật lương cho tháng cụ thể của nhân viên
+  - **Chỉ cập nhật lương cho tháng đó**, không thay đổi lương mặc định của User
+  - **Frontend Usage**: Sử dụng để cập nhật lương cho tháng cụ thể đã tính lương
 
 ### Authentication
 
@@ -360,7 +361,7 @@ Hệ thống cung cấp chức năng quản lý chấm công toàn diện cho qu
 
 1. **Tổng quan chấm công theo tháng** (`GET /api/attendance/admin/monthly-summary`)
    - Hiển thị tất cả nhân viên (không bao gồm admin)
-   - Thông tin: tên, email, username, số lần chấm công trong tháng
+   - Thông tin: tên, email, username, số ngày chấm công và tỷ lệ trong tháng
    - Chi tiết chấm công theo từng ngày trong tháng
    - Mỗi ngày hiển thị: giờ check-in/check-out, thời gian làm việc, văn phòng, ghi chú
 
@@ -408,6 +409,10 @@ Hệ thống cung cấp tính năng tính lương toàn diện dựa trên dữ 
    - **Không tự động thay đổi lương cũ**: Khi thay đổi mức lương chung, các tháng đã tính lương không tự động thay đổi
    - **Cập nhật tháng cụ thể**: Admin có thể cập nhật lương cho tháng cụ thể thông qua API
    - **Lưu trữ theo tháng**: Mỗi tháng có record lương riêng với mức lương áp dụng cho tháng đó
+
+6. **Hai trường hợp tính lương**
+   - **Tính lương mới**: Sử dụng lương mặc định từ User.hourlyRate
+   - **Cập nhật lương tháng đã tính**: Chỉ thay đổi lương cho tháng đó, không ảnh hưởng lương mặc định của User
 
 ### Chấm công
 

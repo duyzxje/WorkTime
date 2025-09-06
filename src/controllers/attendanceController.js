@@ -830,20 +830,25 @@ const getMonthlyAttendanceSummary = async (req, res) => {
         const summary = [];
 
         for (const user of users) {
-            // Đếm số lần chấm công trong tháng
-            const attendanceCount = await Attendance.countDocuments({
-                user: user._id,
-                checkInTime: { $gte: startOfMonth, $lte: endOfMonth }
-            });
-
             // Lấy chi tiết chấm công theo từng ngày
             const dailyAttendance = await Attendance.find({
                 user: user._id,
                 checkInTime: { $gte: startOfMonth, $lte: endOfMonth }
             }).sort('checkInTime');
 
-            // Tạo bảng dữ liệu cho từng ngày trong tháng
+            // Tính số ngày chấm công (số ngày có ít nhất 1 lần check-in)
+            const uniqueDays = new Set();
+            dailyAttendance.forEach(record => {
+                const date = new Date(record.checkInTime).toDateString();
+                uniqueDays.add(date);
+            });
+            const attendanceDays = uniqueDays.size;
+
+            // Tính tỷ lệ chấm công (số ngày chấm công / tổng số ngày trong tháng)
             const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
+            const attendanceRatio = Math.round((attendanceDays / daysInMonth) * 100);
+
+            // Tạo bảng dữ liệu cho từng ngày trong tháng
             const dailyRecords = [];
 
             for (let day = 1; day <= daysInMonth; day++) {
@@ -889,7 +894,8 @@ const getMonthlyAttendanceSummary = async (req, res) => {
                 name: user.name,
                 email: user.email,
                 username: user.username,
-                attendanceCount,
+                attendanceDays: `${attendanceDays}/${daysInMonth}`,
+                attendanceRatio: `${attendanceRatio}%`,
                 dailyRecords
             });
         }
