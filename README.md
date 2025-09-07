@@ -253,7 +253,7 @@ Backend service for employee attendance tracking with GPS validation.
 ## Giới hạn thời gian đăng ký ca (mặc định Thứ 6–Thứ 7)
 
 - Khi nhân viên (không phải admin) đăng ký ca qua `POST /api/shifts/toggle`, hệ thống sẽ kiểm tra thời điểm hiện tại có nằm trong khung thời gian cho phép không.
-- Mặc định, khung thời gian cho phép là từ 00:00 Thứ 6 đến 23:59 Thứ 7 ngay trước tuần được đăng ký (với `weekStartDate` là Thứ Hai của tuần). Ngoài khoảng này, nhân viên sẽ nhận `403` với thông báo: "Đã hết thời gian đăng ký ca làm việc."
+- Mặc định, khung thời gian cho phép là từ 00:00 Thứ 6 đến 23:59 Thứ 7 và chỉ áp dụng để đăng ký cho đúng tuần kế tiếp (tuần sau). Hệ thống tự tính "tuần sau" là Thứ Hai kế tiếp so với ngày hiện tại; nếu `weekStartDate` khác tuần sau thì sẽ bị chặn với thông báo: "Chỉ được đăng ký cho tuần sau trong khung thời gian cho phép." Ngoài khoảng thời gian này, nhân viên sẽ nhận `403` với thông báo: "Đã hết thời gian đăng ký ca làm việc."
 - Admin không bị giới hạn và có thể bật/tắt hoặc điều chỉnh khung thời gian trong phần Settings.
 
 ### Ví dụ cấu hình khung thời gian đăng ký (Admin)

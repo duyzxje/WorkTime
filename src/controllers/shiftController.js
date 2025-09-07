@@ -283,16 +283,33 @@ const toggleShift = async (req, res) => {
             if (settings && settings.shiftRegistration && settings.shiftRegistration.enabled) {
                 const { windowStartOffsetDays, windowEndOffsetDays, startTime, endTime } = settings.shiftRegistration;
 
-                const base = new Date(startDate);
-                const windowStart = new Date(base);
+                // Compute the immediate next week's Monday (tuần sau)
+                const now = new Date();
+                const current = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const dayOfWeek = current.getDay(); // 0=Sun, 1=Mon, ... 6=Sat
+                // Days to next Monday
+                const daysUntilNextMonday = ((8 - dayOfWeek) % 7) || 7; // if Monday => 7 days ahead
+                const nextWeekStart = new Date(current);
+                nextWeekStart.setDate(current.getDate() + daysUntilNextMonday);
+                nextWeekStart.setHours(0, 0, 0, 0);
+
+                // Only allow registering for the immediate next week
+                if (startDate.getTime() !== nextWeekStart.getTime()) {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Chỉ được đăng ký cho tuần sau trong khung thời gian cho phép.'
+                    });
+                }
+
+                // Window is relative to next week's Monday
+                const windowStart = new Date(nextWeekStart);
                 windowStart.setDate(windowStart.getDate() + windowStartOffsetDays);
                 windowStart.setHours((startTime && startTime.hour) || 0, (startTime && startTime.minute) || 0, 0, 0);
 
-                const windowEnd = new Date(base);
+                const windowEnd = new Date(nextWeekStart);
                 windowEnd.setDate(windowEnd.getDate() + windowEndOffsetDays);
                 windowEnd.setHours((endTime && endTime.hour) || 23, (endTime && endTime.minute) || 59, 59, 999);
 
-                const now = new Date();
                 if (now < windowStart || now > windowEnd) {
                     return res.status(403).json({
                         success: false,
