@@ -250,6 +250,25 @@ Backend service for employee attendance tracking with GPS validation.
     - **windowStartOffsetDays / windowEndOffsetDays**: Số ngày lệch so với `weekStartDate` (thứ Hai của tuần đăng ký). Mặc định `-3 → Thứ 6` và `-2 → Thứ 7` trước tuần đó.
     - **startTime / endTime**: Giờ-phút bắt đầu/kết thúc trong ngày tương ứng
 
+- `GET /api/settings/public/shift-registration` (public) - Dành cho FE đọc cấu hình hiển thị
+  - Trả về:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "enabled": true,
+        "windowStartOffsetDays": -3,
+        "windowEndOffsetDays": -2,
+        "startTime": { "hour": 0, "minute": 0 },
+        "endTime": { "hour": 23, "minute": 59 },
+        "nextWeekStartDate": "2025-01-13",
+        "windowStartAt": "2025-01-10T00:00:00.000Z",
+        "windowEndAt": "2025-01-11T23:59:59.999Z"
+      }
+    }
+    ```
+  - Ghi chú: `nextWeekStartDate` là Thứ Hai tuần kế tiếp; FE có thể dùng để set `weekStartDate` khi gọi API đăng ký.
+
 ## Giới hạn thời gian đăng ký ca (mặc định Thứ 6–Thứ 7)
 
 - Khi nhân viên (không phải admin) đăng ký ca qua `POST /api/shifts/toggle`, hệ thống sẽ kiểm tra thời điểm hiện tại có nằm trong khung thời gian cho phép không.
