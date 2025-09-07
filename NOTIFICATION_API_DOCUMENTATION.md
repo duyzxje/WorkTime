@@ -609,7 +609,7 @@ const socket = io(process.env.REACT_APP_API_URL || 'https://your-app-name.onrend
 ```javascript
 socket.on('new_notification', (data) => {
   console.log('New notification:', data.data);
-  // data.data chứa thông tin thông báo
+  // data.data chứa thông tin thông báo                                    
 });
 ```
 
@@ -727,6 +727,100 @@ const markAsRead = async (notificationId) => {
 4. **Tương tác**: User có thể thấy trạng thái kết nối
 5. **Scalable**: Hỗ trợ nhiều user đồng thời
 
+## Web Push Notifications
+
+Hệ thống hỗ trợ Web Push Notifications để hiển thị thông báo trên PWA ngay cả khi user không mở app.
+
+### **Push Notification APIs**
+
+#### **POST /api/push/subscribe**
+Đăng ký push notification
+
+**Request Body:**
+```json
+{
+  "subscription": {
+    "endpoint": "https://fcm.googleapis.com/fcm/send/...",
+    "keys": {
+      "p256dh": "key",
+      "auth": "key"
+    }
+  },
+  "userAgent": "Mozilla/5.0..."
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Push subscription created successfully",
+  "data": {
+    "_id": "ObjectId",
+    "userId": "ObjectId",
+    "endpoint": "https://fcm.googleapis.com/fcm/send/...",
+    "isActive": true
+  }
+}
+```
+
+#### **POST /api/push/unsubscribe**
+Hủy đăng ký push notification
+
+**Request Body:**
+```json
+{
+  "endpoint": "https://fcm.googleapis.com/fcm/send/..."
+}
+```
+
+#### **GET /api/push/vapid-key**
+Lấy VAPID public key
+
+**Response:**
+```json
+{
+  "success": true,
+  "publicKey": "BEl62iUYgUivxIkv69yViEuiBIa40HI..."
+}
+```
+
+#### **POST /api/push/test**
+Test push notification (Admin)
+
+**Request Body:**
+```json
+{
+  "title": "Test Notification",
+  "body": "This is a test push notification"
+}
+```
+
+### **Push Notification Features**
+
+1. **Automatic Push**: Tự động gửi push notification khi có thông báo mới
+2. **PWA Support**: Hoạt động với Progressive Web App
+3. **Offline Notifications**: Nhận thông báo ngay cả khi app không mở
+4. **Rich Notifications**: Hỗ trợ icon, badge, actions
+5. **Click Actions**: Có thể click để mở app hoặc dismiss
+6. **Subscription Management**: Tự động quản lý subscription
+
+### **Service Worker**
+
+Service Worker (`/sw.js`) xử lý:
+- Push events
+- Notification clicks
+- Background sync
+- Cache management
+
+### **PWA Manifest**
+
+Manifest file (`/manifest.json`) cấu hình:
+- App metadata
+- Icons
+- Display mode
+- Shortcuts
+
 ## Lưu ý
 - Tất cả thông báo đều có soft delete (isActive = false)
 - Thông báo hết hạn sẽ không hiển thị trong danh sách user (trừ khi includeExpired = true)
@@ -738,3 +832,6 @@ const markAsRead = async (notificationId) => {
 - **WebSocket hỗ trợ real-time updates cho tất cả thao tác thông báo**
 - **Frontend không cần reload để nhận thông báo mới**
 - **Tự động cập nhật số lượng thông báo chưa đọc**
+- **Web Push Notifications cho PWA - nhận thông báo ngay cả khi app không mở**
+- **Service Worker xử lý push events và notification clicks**
+- **Rich notifications với icon, badge và actions**

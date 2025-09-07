@@ -1,6 +1,7 @@
 const Notification = require('../models/notificationModel');
 const User = require('../models/userModel');
 const NotificationSocketService = require('../services/notificationSocketService');
+const { sendPushToUser, sendPushToUsers, sendPushToAllUsers } = require('./pushController');
 
 // Tạo thông báo mới (Admin)
 const createNotification = async (req, res) => {
@@ -37,6 +38,19 @@ const createNotification = async (req, res) => {
                 });
             }
 
+            // Gửi push notification
+            try {
+                const pushResult = await sendPushToAllUsers({
+                    _id: 'bulk-' + Date.now(),
+                    title,
+                    content,
+                    type: type || 'info'
+                });
+                console.log(`Push notifications sent: ${pushResult.sent}, failed: ${pushResult.failed}`);
+            } catch (pushError) {
+                console.error('Error sending push notifications:', pushError);
+            }
+
             return res.status(201).json({
                 success: true,
                 message: `Tạo thông báo thành công cho ${notifications.length} user`,
@@ -67,6 +81,19 @@ const createNotification = async (req, res) => {
                 });
             }
 
+            // Gửi push notification
+            try {
+                const pushResult = await sendPushToUsers(userIds, {
+                    _id: 'bulk-' + Date.now(),
+                    title,
+                    content,
+                    type: type || 'info'
+                });
+                console.log(`Push notifications sent: ${pushResult.sent}, failed: ${pushResult.failed}`);
+            } catch (pushError) {
+                console.error('Error sending push notifications:', pushError);
+            }
+
             return res.status(201).json({
                 success: true,
                 message: `Tạo thông báo thành công cho ${notifications.length} user`,
@@ -90,6 +117,14 @@ const createNotification = async (req, res) => {
             if (io) {
                 const socketService = new NotificationSocketService(io);
                 socketService.sendNotificationToUser(userId, notification);
+            }
+
+            // Gửi push notification
+            try {
+                const pushResult = await sendPushToUser(userId, notification);
+                console.log(`Push notification sent: ${pushResult.sent}, failed: ${pushResult.failed}`);
+            } catch (pushError) {
+                console.error('Error sending push notification:', pushError);
             }
 
             return res.status(201).json({
