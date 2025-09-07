@@ -6,6 +6,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "seed": "node src/scripts/seedOffices.js",
+    "generate-vapid": "node scripts/generateVapidKeys.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

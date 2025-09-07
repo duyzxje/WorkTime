@@ -1,16 +1,29 @@
 const webpush = require('web-push');
 const PushSubscription = require('../models/pushSubscriptionModel');
 
-// Cấu hình web-push
-webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || 'mailto:admin@worktime.com',
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-);
+// Cấu hình web-push (chỉ khi có VAPID keys)
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails(
+        process.env.VAPID_SUBJECT || 'mailto:admin@worktime.com',
+        process.env.VAPID_PUBLIC_KEY,
+        process.env.VAPID_PRIVATE_KEY
+    );
+    console.log('Web Push VAPID keys configured');
+} else {
+    console.warn('VAPID keys not configured. Web Push notifications will be disabled.');
+}
 
 // Đăng ký push subscription
 const subscribeToPush = async (req, res) => {
     try {
+        // Kiểm tra VAPID keys
+        if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+            return res.status(503).json({
+                success: false,
+                message: 'Push notifications not available - VAPID keys not configured'
+            });
+        }
+
         const { subscription, userAgent } = req.body;
         const userId = req.user.id;
 
@@ -119,9 +132,9 @@ const getVapidPublicKey = async (req, res) => {
         const publicKey = process.env.VAPID_PUBLIC_KEY;
 
         if (!publicKey) {
-            return res.status(500).json({
+            return res.status(503).json({
                 success: false,
-                message: 'VAPID public key not configured'
+                message: 'Push notifications not available - VAPID keys not configured'
             });
         }
 
@@ -142,6 +155,12 @@ const getVapidPublicKey = async (req, res) => {
 // Gửi push notification tới user cụ thể
 const sendPushToUser = async (userId, notification) => {
     try {
+        // Kiểm tra VAPID keys
+        if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+            console.log('VAPID keys not configured. Skipping push notification.');
+            return { sent: 0, failed: 0 };
+        }
+
         const subscriptions = await PushSubscription.findByUserId(userId);
 
         if (subscriptions.length === 0) {
@@ -206,6 +225,12 @@ const sendPushToUser = async (userId, notification) => {
 // Gửi push notification tới nhiều user
 const sendPushToUsers = async (userIds, notification) => {
     try {
+        // Kiểm tra VAPID keys
+        if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+            console.log('VAPID keys not configured. Skipping push notifications.');
+            return { sent: 0, failed: 0 };
+        }
+
         let totalSent = 0;
         let totalFailed = 0;
 
@@ -225,6 +250,12 @@ const sendPushToUsers = async (userIds, notification) => {
 // Gửi push notification tới tất cả user
 const sendPushToAllUsers = async (notification) => {
     try {
+        // Kiểm tra VAPID keys
+        if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+            console.log('VAPID keys not configured. Skipping push notifications.');
+            return { sent: 0, failed: 0 };
+        }
+
         const subscriptions = await PushSubscription.getAllActiveSubscriptions();
 
         if (subscriptions.length === 0) {
