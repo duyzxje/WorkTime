@@ -1,5 +1,6 @@
 const Notification = require('../models/notificationModel');
 const User = require('../models/userModel');
+const NotificationSocketService = require('../services/notificationSocketService');
 
 // Tạo thông báo mới (Admin)
 const createNotification = async (req, res) => {
@@ -24,6 +25,18 @@ const createNotification = async (req, res) => {
                 expiresAt: expiresAt || null
             });
 
+            // Emit WebSocket event
+            const io = req.app.get('io');
+            if (io) {
+                const socketService = new NotificationSocketService(io);
+                socketService.sendNotificationToAllUsers({
+                    title,
+                    content,
+                    type: type || 'info',
+                    expiresAt: expiresAt || null
+                });
+            }
+
             return res.status(201).json({
                 success: true,
                 message: `Tạo thông báo thành công cho ${notifications.length} user`,
@@ -42,6 +55,18 @@ const createNotification = async (req, res) => {
                 expiresAt: expiresAt || null
             }, userIds);
 
+            // Emit WebSocket event
+            const io = req.app.get('io');
+            if (io) {
+                const socketService = new NotificationSocketService(io);
+                socketService.sendNotificationToUsers(userIds, {
+                    title,
+                    content,
+                    type: type || 'info',
+                    expiresAt: expiresAt || null
+                });
+            }
+
             return res.status(201).json({
                 success: true,
                 message: `Tạo thông báo thành công cho ${notifications.length} user`,
@@ -59,6 +84,13 @@ const createNotification = async (req, res) => {
                 userId,
                 expiresAt: expiresAt || null
             });
+
+            // Emit WebSocket event
+            const io = req.app.get('io');
+            if (io) {
+                const socketService = new NotificationSocketService(io);
+                socketService.sendNotificationToUser(userId, notification);
+            }
 
             return res.status(201).json({
                 success: true,
@@ -177,6 +209,17 @@ const markNotificationAsRead = async (req, res) => {
 
         await notification.markAsRead();
 
+        // Emit WebSocket event
+        const io = req.app.get('io');
+        if (io) {
+            const socketService = new NotificationSocketService(io);
+            socketService.notifyNotificationRead(userId, notification._id);
+
+            // Cập nhật số lượng thông báo chưa đọc
+            const unreadCount = await Notification.countUnreadByUserId(userId);
+            socketService.updateUnreadCount(userId, unreadCount);
+        }
+
         res.json({
             success: true,
             message: 'Đánh dấu thông báo đã đọc thành công',
@@ -198,6 +241,14 @@ const markAllNotificationsAsRead = async (req, res) => {
         const userId = req.user.id;
 
         const affectedRows = await Notification.markAllAsReadByUserId(userId);
+
+        // Emit WebSocket event
+        const io = req.app.get('io');
+        if (io) {
+            const socketService = new NotificationSocketService(io);
+            socketService.notifyAllNotificationsRead(userId, affectedRows);
+            socketService.updateUnreadCount(userId, 0);
+        }
 
         res.json({
             success: true,
@@ -257,6 +308,13 @@ const updateNotification = async (req, res) => {
             expiresAt
         });
 
+        // Emit WebSocket event
+        const io = req.app.get('io');
+        if (io) {
+            const socketService = new NotificationSocketService(io);
+            socketService.notifyNotificationUpdated(notification.userId.toString(), notification);
+        }
+
         res.json({
             success: true,
             message: 'Cập nhật thông báo thành công',
@@ -287,6 +345,13 @@ const deleteNotification = async (req, res) => {
         }
 
         await notification.deleteNotification();
+
+        // Emit WebSocket event
+        const io = req.app.get('io');
+        if (io) {
+            const socketService = new NotificationSocketService(io);
+            socketService.notifyNotificationDeleted(notification.userId.toString(), notification._id);
+        }
 
         res.json({
             success: true,

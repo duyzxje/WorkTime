@@ -585,6 +585,148 @@ const markAllAsRead = async () => {
 };
 ```
 
+## WebSocket Real-time Events
+
+Hệ thống hỗ trợ WebSocket để đẩy thông báo real-time tới frontend. Tất cả các thay đổi về thông báo sẽ được push ngay lập tức mà không cần reload trang.
+
+### **Kết nối WebSocket**
+
+```javascript
+import { io } from 'socket.io-client';
+
+const socket = io(process.env.REACT_APP_API_URL || 'https://your-app-name.onrender.com', {
+  auth: {
+    token: 'your-jwt-token'
+  }
+});
+```
+
+### **WebSocket Events**
+
+#### **Client nhận được:**
+
+1. **`new_notification`** - Thông báo mới
+```javascript
+socket.on('new_notification', (data) => {
+  console.log('New notification:', data.data);
+  // data.data chứa thông tin thông báo
+});
+```
+
+2. **`unread_count_update`** - Cập nhật số lượng thông báo chưa đọc
+```javascript
+socket.on('unread_count_update', (data) => {
+  console.log('Unread count:', data.data.count);
+  // Cập nhật badge số lượng thông báo
+});
+```
+
+3. **`notification_read`** - Thông báo đã được đánh dấu đọc
+```javascript
+socket.on('notification_read', (data) => {
+  console.log('Notification read:', data.data.notificationId);
+  // Cập nhật UI để hiển thị đã đọc
+});
+```
+
+4. **`all_notifications_read`** - Tất cả thông báo đã được đánh dấu đọc
+```javascript
+socket.on('all_notifications_read', (data) => {
+  console.log('All notifications read:', data.data.count);
+  // Cập nhật tất cả thông báo thành đã đọc
+});
+```
+
+5. **`notification_updated`** - Thông báo được cập nhật
+```javascript
+socket.on('notification_updated', (data) => {
+  console.log('Notification updated:', data.data);
+  // Cập nhật thông báo trong danh sách
+});
+```
+
+6. **`notification_deleted`** - Thông báo bị xóa
+```javascript
+socket.on('notification_deleted', (data) => {
+  console.log('Notification deleted:', data.data.notificationId);
+  // Xóa thông báo khỏi danh sách
+});
+```
+
+7. **`system_notification`** - Thông báo hệ thống
+```javascript
+socket.on('system_notification', (data) => {
+  console.log('System notification:', data.data);
+  // Hiển thị thông báo hệ thống
+});
+```
+
+8. **`connection_status`** - Trạng thái kết nối
+```javascript
+socket.on('connection_status', (data) => {
+  console.log('Connection status:', data.data.status);
+  // Hiển thị trạng thái kết nối
+});
+```
+
+#### **Client gửi đi:**
+
+1. **`join_notification_room`** - Tham gia room thông báo
+```javascript
+socket.emit('join_notification_room', { room: 'room_name' });
+```
+
+2. **`leave_notification_room`** - Rời khỏi room thông báo
+```javascript
+socket.emit('leave_notification_room', { room: 'room_name' });
+```
+
+### **Room Management**
+
+- **`user_{userId}`**: Room cá nhân của mỗi user
+- **`admin_room`**: Room dành cho admin
+- **Custom rooms**: Có thể tạo room tùy chỉnh
+
+### **Ví dụ sử dụng WebSocket**
+
+```javascript
+// Kết nối WebSocket
+const socket = io(process.env.REACT_APP_API_URL || 'https://your-app-name.onrender.com', {
+  auth: { token: userToken }
+});
+
+// Lắng nghe thông báo mới
+socket.on('new_notification', (data) => {
+  // Hiển thị thông báo mới
+  showNotification(data.data);
+  
+  // Cập nhật số lượng thông báo chưa đọc
+  updateUnreadCount();
+});
+
+// Lắng nghe cập nhật số lượng
+socket.on('unread_count_update', (data) => {
+  document.getElementById('notification-badge').textContent = data.data.count;
+});
+
+// Khi user đánh dấu đã đọc
+const markAsRead = async (notificationId) => {
+  await fetch(`/api/notifications/${notificationId}/read`, {
+    method: 'PUT',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  // WebSocket sẽ tự động cập nhật UI
+};
+```
+
+### **Lợi ích của WebSocket**
+
+1. **Real-time**: Thông báo được push ngay lập tức
+2. **Không cần reload**: UI tự động cập nhật
+3. **Hiệu quả**: Chỉ push thay đổi, không cần polling
+4. **Tương tác**: User có thể thấy trạng thái kết nối
+5. **Scalable**: Hỗ trợ nhiều user đồng thời
+
 ## Lưu ý
 - Tất cả thông báo đều có soft delete (isActive = false)
 - Thông báo hết hạn sẽ không hiển thị trong danh sách user (trừ khi includeExpired = true)
@@ -593,3 +735,6 @@ const markAllAsRead = async () => {
 - Có thể lấy thống kê thông báo theo loại và trạng thái
 - Admin có thể gửi thông báo tới tất cả user, user cụ thể, hoặc theo role
 - Hỗ trợ template thông báo để tạo nhanh các thông báo thường dùng
+- **WebSocket hỗ trợ real-time updates cho tất cả thao tác thông báo**
+- **Frontend không cần reload để nhận thông báo mới**
+- **Tự động cập nhật số lượng thông báo chưa đọc**
