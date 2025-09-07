@@ -1,9 +1,10 @@
 const Notification = require('../models/notificationModel');
+const User = require('../models/userModel');
 
 // Tạo thông báo mới (Admin)
 const createNotification = async (req, res) => {
     try {
-        const { title, content, type, userId, expiresAt } = req.body;
+        const { title, content, type, userId, userIds, sendToAll, expiresAt } = req.body;
 
         // Validation
         if (!title || !content) {
@@ -13,27 +14,66 @@ const createNotification = async (req, res) => {
             });
         }
 
-        if (!userId) {
-            return res.status(400).json({
-                success: false,
-                message: 'User ID là bắt buộc'
+        // Nếu gửi tới tất cả user
+        if (sendToAll) {
+            const notificationService = require('../services/notificationService');
+            const notifications = await notificationService.createNotificationForAllUsers({
+                title,
+                content,
+                type: type || 'info',
+                expiresAt: expiresAt || null
+            });
+
+            return res.status(201).json({
+                success: true,
+                message: `Tạo thông báo thành công cho ${notifications.length} user`,
+                data: notifications,
+                count: notifications.length
             });
         }
 
-        // Tạo thông báo
-        const notification = await Notification.createNotification({
-            title,
-            content,
-            type: type || 'info',
-            userId,
-            expiresAt: expiresAt || null
+        // Nếu gửi tới nhiều user cụ thể
+        if (userIds && Array.isArray(userIds) && userIds.length > 0) {
+            const notificationService = require('../services/notificationService');
+            const notifications = await notificationService.createBulkNotifications({
+                title,
+                content,
+                type: type || 'info',
+                expiresAt: expiresAt || null
+            }, userIds);
+
+            return res.status(201).json({
+                success: true,
+                message: `Tạo thông báo thành công cho ${notifications.length} user`,
+                data: notifications,
+                count: notifications.length
+            });
+        }
+
+        // Nếu gửi tới 1 user cụ thể
+        if (userId) {
+            const notification = await Notification.createNotification({
+                title,
+                content,
+                type: type || 'info',
+                userId,
+                expiresAt: expiresAt || null
+            });
+
+            return res.status(201).json({
+                success: true,
+                message: 'Tạo thông báo thành công',
+                data: notification,
+                count: 1
+            });
+        }
+
+        // Nếu không có userId, userIds, hoặc sendToAll
+        return res.status(400).json({
+            success: false,
+            message: 'Phải chỉ định userId, userIds, hoặc sendToAll'
         });
 
-        res.status(201).json({
-            success: true,
-            message: 'Tạo thông báo thành công',
-            data: notification
-        });
     } catch (error) {
         console.error('Error creating notification:', error);
         res.status(500).json({
@@ -304,6 +344,144 @@ const deleteExpiredNotifications = async (req, res) => {
     }
 };
 
+// Lấy danh sách user để admin chọn (Admin)
+const getUsersForNotification = async (req, res) => {
+    try {
+        const { role, search } = req.query;
+
+        let query = {};
+
+        // Filter theo role nếu có
+        if (role) {
+            query.role = role;
+        }
+
+        // Search theo tên hoặc username nếu có
+        if (search) {
+            query.$or = [
+                { name: { $regex: search, $options: 'i' } },
+                { username: { $regex: search, $options: 'i' } },
+                { email: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        const users = await User.find(query)
+            .select('_id name username email role')
+            .sort({ name: 1 });
+
+        res.json({
+            success: true,
+            data: users,
+            count: users.length
+        });
+    } catch (error) {
+        console.error('Error getting users for notification:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi lấy danh sách user',
+            error: error.message
+        });
+    }
+};
+
+// Tạo thông báo theo role (Admin)
+const createNotificationByRole = async (req, res) => {
+    try {
+        const { title, content, type, role, expiresAt } = req.body;
+
+        // Validation
+        if (!title || !content || !role) {
+            return res.status(400).json({
+                success: false,
+                message: 'Title, content và role là bắt buộc'
+            });
+        }
+
+        const notificationService = require('../services/notificationService');
+        const notifications = await notificationService.createNotificationForRole({
+            title,
+            content,
+            type: type || 'info',
+            expiresAt: expiresAt || null
+        }, role);
+
+        res.status(201).json({
+            success: true,
+            message: `Tạo thông báo thành công cho ${notifications.length} user có role ${role}`,
+            data: notifications,
+            count: notifications.length
+        });
+    } catch (error) {
+        console.error('Error creating notification by role:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi tạo thông báo theo role',
+            error: error.message
+        });
+    }
+};
+
+// Tạo thông báo với template (Admin)
+const createNotificationFromTemplate = async (req, res) => {
+    try {
+        const { templateName, userIds, sendToAll, variables } = req.body;
+
+        // Validation
+        if (!templateName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Template name là bắt buộc'
+            });
+        }
+
+        const notificationService = require('../services/notificationService');
+        let notifications = [];
+
+        if (sendToAll) {
+            // Lấy tất cả user
+            const users = await User.find({}, '_id');
+            const userIds = users.map(user => user._id.toString());
+
+            for (const userId of userIds) {
+                const notification = await notificationService.createFromTemplate(
+                    templateName,
+                    userId,
+                    variables || {}
+                );
+                notifications.push(notification);
+            }
+        } else if (userIds && Array.isArray(userIds) && userIds.length > 0) {
+            for (const userId of userIds) {
+                const notification = await notificationService.createFromTemplate(
+                    templateName,
+                    userId,
+                    variables || {}
+                );
+                notifications.push(notification);
+            }
+        } else {
+            return res.status(400).json({
+                success: false,
+                message: 'Phải chỉ định userIds hoặc sendToAll'
+            });
+        }
+
+        res.status(201).json({
+            success: true,
+            message: `Tạo thông báo từ template thành công cho ${notifications.length} user`,
+            data: notifications,
+            count: notifications.length
+        });
+    } catch (error) {
+        console.error('Error creating notification from template:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi tạo thông báo từ template',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     createNotification,
     getUserNotifications,
@@ -315,5 +493,8 @@ module.exports = {
     updateNotification,
     deleteNotification,
     getAllNotifications,
-    deleteExpiredNotifications
+    deleteExpiredNotifications,
+    getUsersForNotification,
+    createNotificationByRole,
+    createNotificationFromTemplate
 };

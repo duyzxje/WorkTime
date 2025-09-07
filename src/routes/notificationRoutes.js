@@ -11,7 +11,10 @@ const {
     updateNotification,
     deleteNotification,
     getAllNotifications,
-    deleteExpiredNotifications
+    deleteExpiredNotifications,
+    getUsersForNotification,
+    createNotificationByRole,
+    createNotificationFromTemplate
 } = require('../controllers/notificationController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
@@ -25,7 +28,10 @@ router.put('/user/mark-all-read', protect, markAllNotificationsAsRead);
 
 // Admin routes (cần authentication + admin role)
 router.post('/', protect, admin, createNotification);
+router.post('/by-role', protect, admin, createNotificationByRole);
+router.post('/from-template', protect, admin, createNotificationFromTemplate);
 router.get('/admin/all', protect, admin, getAllNotifications);
+router.get('/admin/users', protect, admin, getUsersForNotification);
 router.put('/:id', protect, admin, updateNotification);
 router.delete('/:id', protect, admin, deleteNotification);
 router.delete('/admin/expired', protect, admin, deleteExpiredNotifications);
