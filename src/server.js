@@ -23,6 +23,7 @@ app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/transactions', require('./routes/transactionRoutes'));
 app.use('/api/salary', require('./routes/salaryRoutes'));
+app.use('/api/settings', require('./routes/settingsRoutes'));
 
 // Default route
 app.get('/', (req, res) => {

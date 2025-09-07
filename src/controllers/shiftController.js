@@ -2,6 +2,7 @@ const Shift = require('../models/shiftModel');
 const User = require('../models/userModel');
 const Live = require('../models/liveModel');
 const mongoose = require('mongoose');
+const Settings = require('../models/settingsModel');
 
 // Helper function to get the week's end date
 const getWeekEndDate = (weekStartDate) => {
@@ -273,6 +274,32 @@ const toggleShift = async (req, res) => {
                 evening: false,
                 off: false
             });
+        }
+
+        // Enforce registration window for non-admins when turning ON a shift
+        const isTurningOn = !shift[shiftType];
+        if (req.user && req.user.role !== 'admin' && isTurningOn) {
+            const settings = await Settings.findOne({});
+            if (settings && settings.shiftRegistration && settings.shiftRegistration.enabled) {
+                const { windowStartOffsetDays, windowEndOffsetDays, startTime, endTime } = settings.shiftRegistration;
+
+                const base = new Date(startDate);
+                const windowStart = new Date(base);
+                windowStart.setDate(windowStart.getDate() + windowStartOffsetDays);
+                windowStart.setHours((startTime && startTime.hour) || 0, (startTime && startTime.minute) || 0, 0, 0);
+
+                const windowEnd = new Date(base);
+                windowEnd.setDate(windowEnd.getDate() + windowEndOffsetDays);
+                windowEnd.setHours((endTime && endTime.hour) || 23, (endTime && endTime.minute) || 59, 59, 999);
+
+                const now = new Date();
+                if (now < windowStart || now > windowEnd) {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Đã hết thời gian đăng ký ca làm việc.'
+                    });
+                }
+            }
         }
 
         // Toggle the specified shift type

@@ -14,6 +14,7 @@ Backend service for employee attendance tracking with GPS validation.
 - Live event schedule management with automatic "off" calculation
 - User management with role-based access control
 - **Dashboard statistics**: Total employees count and currently working employees
+- **Giới hạn thời gian đăng ký ca**: Cho phép nhân viên đăng ký ca trong khung thời gian cấu hình (mặc định: Thứ 6–Thứ 7), admin có thể bật/tắt và điều chỉnh
 
 ## Tech Stack
 
@@ -213,6 +214,68 @@ Backend service for employee attendance tracking with GPS validation.
   - Required params: `userId` (ObjectId), `day` (1-7)
   - Required query: `weekStartDate` (YYYY-MM-DD)
   - Admin can delete entire shift schedule for any specified user and day
+
+### Settings (Quản trị cấu hình)
+
+- `GET /api/settings` (admin only) - Lấy cấu hình hệ thống hiện tại
+  - Trả về:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "shiftRegistration": {
+          "enabled": true,
+          "windowStartOffsetDays": -3,
+          "windowEndOffsetDays": -2,
+          "startTime": { "hour": 0, "minute": 0 },
+          "endTime": { "hour": 23, "minute": 59 }
+        }
+      }
+    }
+    ```
+
+- `PUT /api/settings/shift-registration` (admin only) - Cập nhật bật/tắt và khung thời gian đăng ký ca
+  - Body (tùy chọn từng trường):
+    ```json
+    {
+      "enabled": true,
+      "windowStartOffsetDays": -3,
+      "windowEndOffsetDays": -2,
+      "startTime": { "hour": 0, "minute": 0 },
+      "endTime": { "hour": 23, "minute": 59 }
+    }
+    ```
+  - Ý nghĩa:
+    - **enabled**: Bật/tắt giới hạn thời gian đăng ký (admin luôn không bị giới hạn)
+    - **windowStartOffsetDays / windowEndOffsetDays**: Số ngày lệch so với `weekStartDate` (thứ Hai của tuần đăng ký). Mặc định `-3 → Thứ 6` và `-2 → Thứ 7` trước tuần đó.
+    - **startTime / endTime**: Giờ-phút bắt đầu/kết thúc trong ngày tương ứng
+
+## Giới hạn thời gian đăng ký ca (mặc định Thứ 6–Thứ 7)
+
+- Khi nhân viên (không phải admin) đăng ký ca qua `POST /api/shifts/toggle`, hệ thống sẽ kiểm tra thời điểm hiện tại có nằm trong khung thời gian cho phép không.
+- Mặc định, khung thời gian cho phép là từ 00:00 Thứ 6 đến 23:59 Thứ 7 ngay trước tuần được đăng ký (với `weekStartDate` là Thứ Hai của tuần). Ngoài khoảng này, nhân viên sẽ nhận `403` với thông báo: "Đã hết thời gian đăng ký ca làm việc."
+- Admin không bị giới hạn và có thể bật/tắt hoặc điều chỉnh khung thời gian trong phần Settings.
+
+### Ví dụ cấu hình khung thời gian đăng ký (Admin)
+
+Request:
+```
+PUT /api/settings/shift-registration
+Authorization: Bearer <admin-token>
+Content-Type: application/json
+
+{
+  "enabled": true,
+  "windowStartOffsetDays": -3,
+  "windowEndOffsetDays": -2,
+  "startTime": { "hour": 0, "minute": 0 },
+  "endTime": { "hour": 23, "minute": 59 }
+}
+```
+
+Gợi ý cấu hình khác:
+- Chỉ cho đăng ký vào Chủ nhật trước tuần: `windowStartOffsetDays = -1`, `windowEndOffsetDays = -1`, `startTime = {8:00}`, `endTime = {20:00}`
+- Mở cả Thứ 5–Chủ nhật trước tuần: `windowStartOffsetDays = -4`, `windowEndOffsetDays = -1`
 
 ### Live Events
 
