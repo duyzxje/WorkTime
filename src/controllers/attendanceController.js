@@ -923,7 +923,17 @@ const getMonthlyAttendanceSummary = async (req, res) => {
 const updateAttendanceRecord = async (req, res) => {
     try {
         const { attendanceId } = req.params;
-        const { checkInTime, checkOutTime, notes, officeId } = req.body;
+        const {
+            checkInTime,
+            checkOutTime,
+            // Optional split fields
+            checkInDate,
+            checkInTimePart,
+            checkOutDate,
+            checkOutTimePart,
+            notes,
+            officeId
+        } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(attendanceId)) {
             return res.status(400).json({
@@ -941,21 +951,52 @@ const updateAttendanceRecord = async (req, res) => {
             });
         }
 
+        // Helpers to compose date from separate fields
+        const buildDateTime = (dateStr, timeStr) => {
+            if (!dateStr || !timeStr) return null;
+            const base = new Date(dateStr);
+            const [hh, mm] = String(timeStr).split(':');
+            const result = new Date(base);
+            result.setHours(parseInt(hh), parseInt(mm), 0, 0);
+            return result;
+        };
+
+        // Derive new check-in and check-out if provided via either ISO or split format
+        const newCheckIn = checkInTime
+            ? new Date(checkInTime)
+            : buildDateTime(checkInDate, checkInTimePart);
+        const newCheckOut = checkOutTime
+            ? new Date(checkOutTime)
+            : buildDateTime(checkOutDate, checkOutTimePart);
+
         // Update fields if provided
-        if (checkInTime) {
-            attendance.checkInTime = new Date(checkInTime);
+        if (newCheckIn instanceof Date && !isNaN(newCheckIn)) {
+            attendance.checkInTime = newCheckIn;
         }
 
-        if (checkOutTime) {
-            attendance.checkOutTime = new Date(checkOutTime);
+        if (newCheckOut instanceof Date && !isNaN(newCheckOut)) {
+            attendance.checkOutTime = newCheckOut;
             attendance.status = 'checked-out';
+        }
 
+        // Validate chronological order if both exist
+        if (attendance.checkInTime && attendance.checkOutTime) {
+            if (attendance.checkOutTime < attendance.checkInTime) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Check-out time must be after check-in time'
+                });
+            }
             // Recalculate work duration
-            if (attendance.checkInTime) {
-                const workDurationMinutes = Math.round(
-                    (attendance.checkOutTime - attendance.checkInTime) / (1000 * 60)
-                );
-                attendance.workDuration = workDurationMinutes;
+            const workDurationMinutes = Math.round(
+                (attendance.checkOutTime - attendance.checkInTime) / (1000 * 60)
+            );
+            attendance.workDuration = workDurationMinutes;
+        } else {
+            // If only check-in provided (no checkout), reset status/duration accordingly
+            if (attendance.checkInTime && !attendance.checkOutTime) {
+                attendance.status = 'checked-in';
+                attendance.workDuration = 0;
             }
         }
 

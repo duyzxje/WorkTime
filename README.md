@@ -166,9 +166,30 @@ Backend service for employee attendance tracking with GPS validation.
     }
     ```
   
-- `PUT /api/attendance/admin/:attendanceId` - Update attendance record (admin only)
-  - Optional body: `{ checkInTime, checkOutTime, notes, officeId }`
-  - Automatically recalculates work duration if check-out time is updated
+- `PUT /api/attendance/admin/:attendanceId` - Cập nhật bản ghi chấm công (admin only)
+  - Body hỗ trợ 2 cách nhập thời gian:
+    - Dạng ISO: `{ checkInTime, checkOutTime }` (chuỗi ISO `YYYY-MM-DDTHH:mm:ss.sssZ`)
+    - Tách ngày/giờ: `{ checkInDate, checkInTimePart, checkOutDate, checkOutTimePart }`
+      - `checkInDate`, `checkOutDate`: `YYYY-MM-DD`
+      - `checkInTimePart`, `checkOutTimePart`: `HH:mm`
+  - Các trường khác (tùy chọn): `{ notes, officeId }`
+  - Hành vi:
+    - Tự động tính lại `workDuration` (phút) khi có đủ `checkIn` và `checkOut`
+    - Xác thực: `checkOut` phải sau `checkIn` (nếu không sẽ trả về 400)
+    - Nếu chỉ có `checkIn` (không có `checkOut`), trạng thái đặt về `checked-in` và `workDuration = 0`
+    - Khi bản ghi ở trạng thái `checked-out`, hệ thống sẽ tự kích hoạt tính lương lại cho ca đó
+  - Ví dụ:
+    ```bash
+    # Dùng ISO datetime
+    curl -X PUT http://localhost:5000/api/attendance/admin/ATTENDANCE_ID \
+      -H "Content-Type: application/json" -H "Authorization: Bearer ADMIN_TOKEN" \
+      -d '{"checkInTime":"2025-09-01T08:30:00.000Z","checkOutTime":"2025-09-01T17:45:00.000Z"}'
+
+    # Dùng cặp ngày + giờ
+    curl -X PUT http://localhost:5000/api/attendance/admin/ATTENDANCE_ID \
+      -H "Content-Type: application/json" -H "Authorization: Bearer ADMIN_TOKEN" \
+      -d '{"checkInDate":"2025-09-01","checkInTimePart":"08:30","checkOutDate":"2025-09-01","checkOutTimePart":"17:45"}'
+    ```
   
 - `DELETE /api/attendance/admin/:attendanceId` - Delete attendance record (admin only)
   - Permanently removes the attendance record
