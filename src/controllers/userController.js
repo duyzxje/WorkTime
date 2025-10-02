@@ -389,11 +389,7 @@ const getCurrentlyWorkingEmployees = async (req, res) => {
                 role: attendance.user.role,
                 hourlyRate: attendance.user.hourlyRate,
                 checkInTime: attendance.checkInTime,
-                checkInTimeFormatted: new Date(attendance.checkInTime).toLocaleTimeString('vi-VN', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                }),
-                checkInDateFormatted: new Date(attendance.checkInTime).toLocaleDateString('vi-VN'),
+                // Raw datetime values returned as-is
                 officeId: attendance.officeId,
                 notes: attendance.notes
             }));

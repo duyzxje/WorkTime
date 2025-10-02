@@ -328,23 +328,7 @@ const getAttendanceHistory = async (req, res) => {
                 attendance.workTimeFormatted = `${hours}h${minutes}m`;
             }
 
-            // Định dạng thời gian check-in/check-out (trả về đúng thời gian đã lưu trong DB)
-            if (attendance.checkInTime) {
-                const checkInDate = new Date(attendance.checkInTime);
-                attendance.checkInTimeFormatted = checkInDate.toLocaleTimeString('vi-VN', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-                attendance.checkInDateFormatted = checkInDate.toLocaleDateString('vi-VN');
-            }
-
-            if (attendance.checkOutTime) {
-                const checkOutDate = new Date(attendance.checkOutTime);
-                attendance.checkOutTimeFormatted = checkOutDate.toLocaleTimeString('vi-VN', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-            }
+            // Raw datetime values are returned as-is (UTC format)
 
             return attendance;
         });
@@ -686,22 +670,8 @@ const getAttendanceSummary = async (req, res) => {
                     records: dayRecords.map(record => {
                         const recordObj = record.toObject();
 
-                        // Định dạng giờ check-in/check-out (trả về đúng thời gian đã lưu trong DB)
-                        if (recordObj.checkInTime) {
-                            recordObj.checkInTimeFormatted = new Date(recordObj.checkInTime)
-                                .toLocaleTimeString('vi-VN', {
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                });
-                        }
-
+                        // Process work duration
                         if (recordObj.checkOutTime) {
-                            recordObj.checkOutTimeFormatted = new Date(recordObj.checkOutTime)
-                                .toLocaleTimeString('vi-VN', {
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                });
-
                             // Cập nhật thời gian làm việc
                             if (recordObj.workDuration) {
                                 totalWorkMinutes += recordObj.workDuration;
@@ -728,9 +698,7 @@ const getAttendanceSummary = async (req, res) => {
                         return {
                             id: recordObj._id,
                             checkInTime: recordObj.checkInTime,
-                            checkInTimeFormatted: recordObj.checkInTimeFormatted,
                             checkOutTime: recordObj.checkOutTime,
-                            checkOutTimeFormatted: recordObj.checkOutTimeFormatted || 'Chưa check-out',
                             status: recordObj.status,
                             workDuration: recordObj.workDuration || 0,
                             workTimeFormatted: recordObj.workTimeFormatted || '0h0m',
@@ -764,20 +732,8 @@ const getAttendanceSummary = async (req, res) => {
                 minutes: 0,
                 formatted: '0h0m'
             },
-            earliestCheckIn: earliestCheckIn ? {
-                time: earliestCheckIn,
-                formatted: new Date(earliestCheckIn).toLocaleTimeString('vi-VN', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                })
-            } : null,
-            latestCheckOut: latestCheckOut ? {
-                time: latestCheckOut,
-                formatted: new Date(latestCheckOut).toLocaleTimeString('vi-VN', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                })
-            } : null,
+            earliestCheckIn: earliestCheckIn,
+            latestCheckOut: latestCheckOut,
             incompleteRecords,
             dailyRecords
         };
@@ -868,15 +824,7 @@ const getMonthlyAttendanceSummary = async (req, res) => {
                         records: dayRecords.map(record => ({
                             id: record._id,
                             checkInTime: record.checkInTime,
-                            checkInTimeFormatted: new Date(record.checkInTime).toLocaleTimeString('vi-VN', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                            }),
                             checkOutTime: record.checkOutTime,
-                            checkOutTimeFormatted: record.checkOutTime ? new Date(record.checkOutTime).toLocaleTimeString('vi-VN', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                            }) : null,
                             status: record.status,
                             workDuration: record.workDuration || 0,
                             workTimeFormatted: record.workDuration ?

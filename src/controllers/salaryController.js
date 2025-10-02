@@ -112,7 +112,6 @@ const calculateSalary = async (req, res) => {
                 summary: {
                     month,
                     year,
-                    monthName: new Date(year, month - 1, 1).toLocaleString('vi-VN', { month: 'long' }),
                     totalHours,
                     totalSalary,
                     dailyRecordsCount: dailyRecords.length,
@@ -121,10 +120,8 @@ const calculateSalary = async (req, res) => {
                 },
                 dailyRecords: dailyRecords.map(record => ({
                     date: record.date,
-                    dateFormatted: new Date(record.date).toLocaleDateString('vi-VN'),
-                    dayOfWeek: new Date(record.date).toLocaleDateString('vi-VN', { weekday: 'long' }),
-                    checkInTime: record.checkInTime ? new Date(record.checkInTime).toLocaleTimeString('vi-VN') : '',
-                    checkOutTime: record.checkOutTime ? new Date(record.checkOutTime).toLocaleTimeString('vi-VN') : '',
+                    checkInTime: record.checkInTime,
+                    checkOutTime: record.checkOutTime,
                     workHours: record.workHours,
                     dailySalary: record.dailySalary,
                     isValid: record.isValid,
@@ -269,12 +266,12 @@ const exportSalaryToExcel = async (req, res) => {
             const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
             dailySheet.addRow({
-                date: date.toLocaleDateString('vi-VN'),
+                date: date.toISOString().split('T')[0],
                 dayOfWeek: dayNames[date.getDay()],
-                checkInTime: record.checkInTime ? new Date(record.checkInTime).toLocaleTimeString('vi-VN') : '',
-                checkOutTime: record.checkOutTime ? new Date(record.checkOutTime).toLocaleTimeString('vi-VN') : '',
+                checkInTime: record.checkInTime || '',
+                checkOutTime: record.checkOutTime || '',
                 workHours: record.workHours,
-                dailySalary: record.dailySalary.toLocaleString('vi-VN') + 'đ',
+                dailySalary: record.dailySalary + 'đ',
                 isValid: record.isValid ? 'Có' : 'Không',
                 notes: record.notes || ''
             });
@@ -303,10 +300,10 @@ const exportSalaryToExcel = async (req, res) => {
         summarySheet.addRows([
             { info: 'Tên nhân viên', value: salaryRecord.userId.name },
             { info: 'Tháng', value: `${monthNames[month - 1]} ${year}` },
-            { info: 'Mức lương/giờ', value: salaryRecord.hourlyRate.toLocaleString('vi-VN') + 'đ' },
+            { info: 'Mức lương/giờ', value: salaryRecord.hourlyRate + 'đ' },
             { info: 'Tổng số ngày làm', value: salaryRecord.dailyRecords.length },
             { info: 'Tổng số giờ làm', value: salaryRecord.totalHours + ' giờ' },
-            { info: 'Tổng lương', value: salaryRecord.totalSalary.toLocaleString('vi-VN') + 'đ' }
+            { info: 'Tổng lương', value: salaryRecord.totalSalary + 'đ' }
         ]);
 
         // Style the summary sheet
@@ -525,7 +522,7 @@ const updateSalaryForMonth = async (req, res) => {
                 summary: {
                     month,
                     year,
-                    monthName: new Date(year, month - 1, 1).toLocaleString('vi-VN', { month: 'long' }),
+                    // monthName removed
                     hourlyRate,
                     totalHours: salaryRecord.totalHours,
                     totalSalary: salaryRecord.totalSalary,
