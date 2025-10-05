@@ -287,9 +287,9 @@ const getAttendanceHistory = async (req, res) => {
                 return res.status(400).json({ message: 'Invalid year format.' });
             }
 
-            // Tính ngày đầu và cuối của tháng (UTC+7 Vietnam timezone)
-            const startOfMonth = new Date(Date.UTC(yearNum, monthNum - 1, 1, -7, 0, 0)); // -7 hours to get Vietnam timezone
-            const endOfMonth = new Date(Date.UTC(yearNum, monthNum, 0, 16, 59, 59)); // Last day of month at 23:59:59 Vietnam time
+            // Tính ngày đầu và cuối của tháng theo UTC chuẩn
+            const startOfMonth = new Date(Date.UTC(yearNum, monthNum - 1, 1, 0, 0, 0));
+            const endOfMonth = new Date(Date.UTC(yearNum, monthNum, 0, 23, 59, 59));
 
             console.log(`Start of month: ${startOfMonth.toISOString()}`);
             console.log(`End of month: ${endOfMonth.toISOString()}`);
@@ -377,9 +377,9 @@ const getAllAttendance = async (req, res) => {
                 return res.status(400).json({ message: 'Invalid year format.' });
             }
 
-            // Tính ngày đầu và cuối của tháng (UTC+7 Vietnam timezone)
-            const startOfMonth = new Date(Date.UTC(yearNum, monthNum - 1, 1, -7, 0, 0)); // -7 hours to get Vietnam timezone
-            const endOfMonth = new Date(Date.UTC(yearNum, monthNum, 0, 16, 59, 59)); // Last day of month at 23:59:59 Vietnam time
+            // Tính ngày đầu và cuối của tháng theo UTC chuẩn
+            const startOfMonth = new Date(Date.UTC(yearNum, monthNum - 1, 1, 0, 0, 0));
+            const endOfMonth = new Date(Date.UTC(yearNum, monthNum, 0, 23, 59, 59));
 
             console.log(`Start of month: ${startOfMonth.toISOString()}`);
             console.log(`End of month: ${endOfMonth.toISOString()}`);
@@ -606,9 +606,9 @@ const getAttendanceSummary = async (req, res) => {
             return res.status(400).json({ message: 'Invalid year format.' });
         }
 
-        // Tính ngày đầu và cuối của tháng (UTC+7 Vietnam timezone)
-        const startOfMonth = new Date(Date.UTC(yearNum, monthNum - 1, 1, -7, 0, 0)); // -7 hours to get Vietnam timezone
-        const endOfMonth = new Date(Date.UTC(yearNum, monthNum, 0, 16, 59, 59)); // Last day of month at 23:59:59 Vietnam time
+        // Tính ngày đầu và cuối của tháng theo UTC chuẩn
+        const startOfMonth = new Date(Date.UTC(yearNum, monthNum - 1, 1, 0, 0, 0));
+        const endOfMonth = new Date(Date.UTC(yearNum, monthNum, 0, 23, 59, 59));
 
         console.log(`Start of month: ${startOfMonth.toISOString()}`);
         console.log(`End of month: ${endOfMonth.toISOString()}`);
@@ -651,8 +651,8 @@ const getAttendanceSummary = async (req, res) => {
         totalDaysWorked = uniqueDays.size;
 
         for (let day = 1; day <= daysInMonth; day++) {
-            const currentDate = new Date(Date.UTC(yearNum, monthNum - 1, day, -7, 0, 0));
-            const nextDate = new Date(Date.UTC(yearNum, monthNum - 1, day, 16, 59, 59));
+            const currentDate = new Date(Date.UTC(yearNum, monthNum - 1, day, 0, 0, 0));
+            const nextDate = new Date(Date.UTC(yearNum, monthNum - 1, day, 23, 59, 59));
 
             // Tìm các bản ghi trong ngày này
             const dayRecords = attendanceRecords.filter(record => {
@@ -776,9 +776,9 @@ const getMonthlyAttendanceSummary = async (req, res) => {
             });
         }
 
-        // Tính ngày đầu và cuối của tháng (UTC+7 Vietnam timezone)
-        const startOfMonth = new Date(Date.UTC(yearNum, monthNum - 1, 1, -7, 0, 0));
-        const endOfMonth = new Date(Date.UTC(yearNum, monthNum, 0, 16, 59, 59));
+        // Tính ngày đầu và cuối của tháng theo UTC chuẩn
+        const startOfMonth = new Date(Date.UTC(yearNum, monthNum - 1, 1, 0, 0, 0));
+        const endOfMonth = new Date(Date.UTC(yearNum, monthNum, 0, 23, 59, 59));
 
         // Lấy tất cả users (không bao gồm admin)
         const users = await User.find({ role: { $ne: 'admin' } }).select('name email username');
@@ -808,8 +808,8 @@ const getMonthlyAttendanceSummary = async (req, res) => {
             const dailyRecords = [];
 
             for (let day = 1; day <= daysInMonth; day++) {
-                const currentDate = new Date(Date.UTC(yearNum, monthNum - 1, day, -7, 0, 0));
-                const nextDate = new Date(Date.UTC(yearNum, monthNum - 1, day, 16, 59, 59));
+                const currentDate = new Date(Date.UTC(yearNum, monthNum - 1, day, 0, 0, 0));
+                const nextDate = new Date(Date.UTC(yearNum, monthNum - 1, day, 23, 59, 59));
 
                 // Tìm các bản ghi trong ngày này
                 const dayRecords = dailyAttendance.filter(record => {

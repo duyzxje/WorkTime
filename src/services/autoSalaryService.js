@@ -24,9 +24,9 @@ const calculateMonthlySalary = async (userId, month, year, hourlyRate = null) =>
             hourlyRate = user.hourlyRate;
         }
 
-        // Tính date range cho tháng
-        const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+        // Tính date range cho tháng theo UTC chuẩn
+        const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
+        const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59));
 
         // Lấy tất cả attendance records đã hoàn thành trong tháng
         const attendanceRecords = await Attendance.find({
