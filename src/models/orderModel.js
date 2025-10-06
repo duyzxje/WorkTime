@@ -1,4 +1,4 @@
-const { getPgPool } = require('../config/db');
+const { getPgPoolAsync } = require('../config/db');
 
 const ORDER_STATUSES = ['chua_rep', 'giu_don', 'di_don', 'gap', 'hoan_thanh', 'warning'];
 const STATUS_ORDER = ['gap', 'di_don', 'chua_rep', 'giu_don', 'warning', 'hoan_thanh'];
@@ -23,7 +23,7 @@ function getByField(by) {
 }
 
 async function listOrders({ start, end, page = 1, limit = 20, search, status, by }) {
-    const pool = getPgPool();
+    const pool = await getPgPoolAsync();
     const client = await pool.connect();
     try {
         const byField = getByField(by);
@@ -85,7 +85,7 @@ async function listOrders({ start, end, page = 1, limit = 20, search, status, by
 }
 
 async function getOrderById(orderId) {
-    const pool = getPgPool();
+    const pool = await getPgPoolAsync();
     const { rows } = await pool.query(
         'SELECT id, customer_username, total_amount, status, live_date, created_at FROM orders WHERE id = $1',
         [orderId]
@@ -94,7 +94,7 @@ async function getOrderById(orderId) {
 }
 
 async function getOrderItems(orderId) {
-    const pool = getPgPool();
+    const pool = await getPgPoolAsync();
     const { rows } = await pool.query(
         'SELECT id, order_id, product_name, content, quantity, price, unit_price, created_at FROM order_items WHERE order_id = $1 ORDER BY created_at ASC',
         [orderId]
@@ -103,7 +103,7 @@ async function getOrderItems(orderId) {
 }
 
 async function updateOrderStatus(orderId, status) {
-    const pool = getPgPool();
+    const pool = await getPgPoolAsync();
     const s = normalizeStatus(status);
     if (!s) return null;
     const { rows } = await pool.query(
@@ -114,7 +114,7 @@ async function updateOrderStatus(orderId, status) {
 }
 
 async function deleteOrder(orderId) {
-    const pool = getPgPool();
+    const pool = await getPgPoolAsync();
     const { rowCount } = await pool.query('DELETE FROM orders WHERE id = $1', [orderId]);
     return rowCount > 0;
 }
