@@ -8,7 +8,12 @@ const {
     updateHourlyRate,
     getUsersForSalary,
     recalculateMonth,
-    updateSalaryForMonth
+    updateSalaryForMonth,
+    getDetailedSalaryTable,
+    updateDailySalary,
+    updateBonus,
+    updateDeduction,
+    getDetailedMonthlySalaries
 } = require('../controllers/salaryController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
@@ -51,5 +56,30 @@ router.post('/recalculate-month', protect, admin, recalculateMonth);
 // @desc    Update salary for a specific month with new hourly rate
 // @access  Private/Admin
 router.put('/update-month', protect, admin, updateSalaryForMonth);
+
+// @route   GET /api/salary/detailed/:userId/:month/:year
+// @desc    Get detailed salary table for admin management
+// @access  Private/Admin
+router.get('/detailed/:userId/:month/:year', protect, admin, getDetailedSalaryTable);
+
+// @route   PUT /api/salary/daily/:salaryId
+// @desc    Update daily salary for a specific date
+// @access  Private/Admin
+router.put('/daily/:salaryId', protect, admin, updateDailySalary);
+
+// @route   PUT /api/salary/bonus/:salaryId
+// @desc    Add or update bonus for salary record
+// @access  Private/Admin
+router.put('/bonus/:salaryId', protect, admin, updateBonus);
+
+// @route   PUT /api/salary/deduction/:salaryId
+// @desc    Add or update deduction for salary record
+// @access  Private/Admin
+router.put('/deduction/:salaryId', protect, admin, updateDeduction);
+
+// @route   GET /api/salary/detailed-monthly/:month/:year
+// @desc    Get all detailed salary records for a month (admin overview)
+// @access  Private/Admin
+router.get('/detailed-monthly/:month/:year', protect, admin, getDetailedMonthlySalaries);
 
 module.exports = router;

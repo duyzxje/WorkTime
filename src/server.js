@@ -40,6 +40,7 @@ app.use('/api/salary', require('./routes/salaryRoutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/push', require('./routes/pushRoutes'));
+app.use('/api/orders', require('./routes/orderRoutes'));
 
 // Socket.IO authentication middleware
 io.use(async (socket, next) => {

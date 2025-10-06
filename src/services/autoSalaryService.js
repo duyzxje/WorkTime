@@ -63,20 +63,26 @@ const calculateMonthlySalary = async (userId, month, year, hourlyRate = null) =>
         totalSalary = Math.round(totalSalary);
 
         // Tạo hoặc cập nhật salary record
-        const salaryData = {
-            userId,
-            hourlyRate,
-            month,
-            year,
-            totalHours,
-            totalSalary,
-            dailyRecords
-        };
-
         const existingSalary = await Salary.findOne({ userId, month, year });
         let salaryRecord;
 
         if (existingSalary) {
+            // Giữ lại các giá trị bonus, deduction và finalSalary hiện có
+            const salaryData = {
+                userId,
+                hourlyRate,
+                month,
+                year,
+                totalHours,
+                totalSalary,
+                dailyRecords,
+                bonus: existingSalary.bonus || 0,
+                bonusReason: existingSalary.bonusReason || '',
+                deduction: existingSalary.deduction || 0,
+                deductionReason: existingSalary.deductionReason || '',
+                finalSalary: totalSalary + (existingSalary.bonus || 0) - (existingSalary.deduction || 0)
+            };
+
             salaryRecord = await Salary.findByIdAndUpdate(
                 existingSalary._id,
                 salaryData,
@@ -84,6 +90,21 @@ const calculateMonthlySalary = async (userId, month, year, hourlyRate = null) =>
             );
             console.log(`[Auto Salary] Updated existing salary record for user ${userId}, month ${month}/${year}`);
         } else {
+            const salaryData = {
+                userId,
+                hourlyRate,
+                month,
+                year,
+                totalHours,
+                totalSalary,
+                dailyRecords,
+                bonus: 0,
+                bonusReason: '',
+                deduction: 0,
+                deductionReason: '',
+                finalSalary: totalSalary
+            };
+
             salaryRecord = await Salary.create(salaryData);
             console.log(`[Auto Salary] Created new salary record for user ${userId}, month ${month}/${year}`);
         }

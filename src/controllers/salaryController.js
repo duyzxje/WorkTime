@@ -539,6 +539,337 @@ const updateSalaryForMonth = async (req, res) => {
     }
 };
 
+// @desc    Get detailed salary table for admin management
+// @route   GET /api/salary/detailed/:userId/:month/:year
+// @access  Private/Admin
+const getDetailedSalaryTable = async (req, res) => {
+    try {
+        const { userId, month, year } = req.params;
+
+        if (!userId || !month || !year) {
+            return res.status(400).json({
+                success: false,
+                message: 'User ID, month, and year are required'
+            });
+        }
+
+        // Validate month and year
+        if (month < 1 || month > 12) {
+            return res.status(400).json({
+                success: false,
+                message: 'Month must be between 1 and 12'
+            });
+        }
+
+        // Get salary record
+        const salaryRecord = await Salary.findOne({
+            userId,
+            month: parseInt(month),
+            year: parseInt(year)
+        }).populate('userId', 'name username email hourlyRate');
+
+        if (!salaryRecord) {
+            return res.status(404).json({
+                success: false,
+                message: 'Salary record not found for this month'
+            });
+        }
+
+        // Calculate final salary including bonus and deduction
+        const finalSalary = salaryRecord.totalSalary + salaryRecord.bonus - salaryRecord.deduction;
+
+        res.json({
+            success: true,
+            data: {
+                salary: {
+                    id: salaryRecord._id,
+                    userId: salaryRecord.userId._id,
+                    userName: salaryRecord.userId.name,
+                    userEmail: salaryRecord.userId.email,
+                    hourlyRate: salaryRecord.hourlyRate,
+                    month: salaryRecord.month,
+                    year: salaryRecord.year,
+                    totalHours: salaryRecord.totalHours,
+                    totalSalary: salaryRecord.totalSalary,
+                    bonus: salaryRecord.bonus,
+                    bonusReason: salaryRecord.bonusReason,
+                    deduction: salaryRecord.deduction,
+                    deductionReason: salaryRecord.deductionReason,
+                    finalSalary: finalSalary,
+                    dailyRecords: salaryRecord.dailyRecords.map(record => ({
+                        date: record.date,
+                        workHours: record.workHours,
+                        dailySalary: record.dailySalary,
+                        adjustedSalary: record.adjustedSalary || 0,
+                        salaryAdjustmentReason: record.salaryAdjustmentReason || '',
+                        checkInTime: record.checkInTime,
+                        checkOutTime: record.checkOutTime,
+                        isValid: record.isValid,
+                        notes: record.notes || ''
+                    })),
+                    createdAt: salaryRecord.createdAt,
+                    updatedAt: salaryRecord.updatedAt
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error in getDetailedSalaryTable:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error: ' + error.message
+        });
+    }
+};
+
+// @desc    Update daily salary for a specific date
+// @route   PUT /api/salary/daily/:salaryId
+// @access  Private/Admin
+const updateDailySalary = async (req, res) => {
+    try {
+        const { salaryId } = req.params;
+        const { date, adjustedSalary, salaryAdjustmentReason } = req.body;
+
+        if (!date || adjustedSalary === undefined || !salaryAdjustmentReason) {
+            return res.status(400).json({
+                success: false,
+                message: 'Date, adjusted salary, and adjustment reason are required'
+            });
+        }
+
+        // Get salary record
+        const salaryRecord = await Salary.findById(salaryId);
+        if (!salaryRecord) {
+            return res.status(404).json({
+                success: false,
+                message: 'Salary record not found'
+            });
+        }
+
+        // Find the daily record to update
+        const targetDate = new Date(date);
+        const dailyRecordIndex = salaryRecord.dailyRecords.findIndex(record => {
+            const recordDate = new Date(record.date);
+            return recordDate.toDateString() === targetDate.toDateString();
+        });
+
+        if (dailyRecordIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: 'Daily record not found for the specified date'
+            });
+        }
+
+        // Update the daily record
+        salaryRecord.dailyRecords[dailyRecordIndex].adjustedSalary = adjustedSalary;
+        salaryRecord.dailyRecords[dailyRecordIndex].salaryAdjustmentReason = salaryAdjustmentReason;
+
+        // Recalculate total salary
+        let newTotalSalary = 0;
+        salaryRecord.dailyRecords.forEach(record => {
+            const dailyAmount = record.adjustedSalary > 0 ? record.adjustedSalary : record.dailySalary;
+            newTotalSalary += dailyAmount;
+        });
+
+        // Update salary record
+        salaryRecord.totalSalary = Math.round(newTotalSalary);
+        salaryRecord.finalSalary = salaryRecord.totalSalary + salaryRecord.bonus - salaryRecord.deduction;
+
+        await salaryRecord.save();
+
+        res.json({
+            success: true,
+            message: 'Daily salary updated successfully',
+            data: {
+                salary: salaryRecord,
+                updatedDailyRecord: salaryRecord.dailyRecords[dailyRecordIndex]
+            }
+        });
+    } catch (error) {
+        console.error('Error in updateDailySalary:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error: ' + error.message
+        });
+    }
+};
+
+// @desc    Add or update bonus for salary record
+// @route   PUT /api/salary/bonus/:salaryId
+// @access  Private/Admin
+const updateBonus = async (req, res) => {
+    try {
+        const { salaryId } = req.params;
+        const { bonus, bonusReason } = req.body;
+
+        if (bonus === undefined || !bonusReason) {
+            return res.status(400).json({
+                success: false,
+                message: 'Bonus amount and reason are required'
+            });
+        }
+
+        if (bonus < 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Bonus amount must be positive'
+            });
+        }
+
+        // Get salary record
+        const salaryRecord = await Salary.findById(salaryId);
+        if (!salaryRecord) {
+            return res.status(404).json({
+                success: false,
+                message: 'Salary record not found'
+            });
+        }
+
+        // Update bonus
+        salaryRecord.bonus = bonus;
+        salaryRecord.bonusReason = bonusReason;
+        salaryRecord.finalSalary = salaryRecord.totalSalary + salaryRecord.bonus - salaryRecord.deduction;
+
+        await salaryRecord.save();
+
+        res.json({
+            success: true,
+            message: 'Bonus updated successfully',
+            data: {
+                salary: salaryRecord
+            }
+        });
+    } catch (error) {
+        console.error('Error in updateBonus:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error: ' + error.message
+        });
+    }
+};
+
+// @desc    Add or update deduction for salary record
+// @route   PUT /api/salary/deduction/:salaryId
+// @access  Private/Admin
+const updateDeduction = async (req, res) => {
+    try {
+        const { salaryId } = req.params;
+        const { deduction, deductionReason } = req.body;
+
+        if (deduction === undefined || !deductionReason) {
+            return res.status(400).json({
+                success: false,
+                message: 'Deduction amount and reason are required'
+            });
+        }
+
+        if (deduction < 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Deduction amount must be positive'
+            });
+        }
+
+        // Get salary record
+        const salaryRecord = await Salary.findById(salaryId);
+        if (!salaryRecord) {
+            return res.status(404).json({
+                success: false,
+                message: 'Salary record not found'
+            });
+        }
+
+        // Update deduction
+        salaryRecord.deduction = deduction;
+        salaryRecord.deductionReason = deductionReason;
+        salaryRecord.finalSalary = salaryRecord.totalSalary + salaryRecord.bonus - salaryRecord.deduction;
+
+        await salaryRecord.save();
+
+        res.json({
+            success: true,
+            message: 'Deduction updated successfully',
+            data: {
+                salary: salaryRecord
+            }
+        });
+    } catch (error) {
+        console.error('Error in updateDeduction:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error: ' + error.message
+        });
+    }
+};
+
+// @desc    Get all detailed salary records for a month (admin overview)
+// @route   GET /api/salary/detailed-monthly/:month/:year
+// @access  Private/Admin
+const getDetailedMonthlySalaries = async (req, res) => {
+    try {
+        const { month, year } = req.params;
+
+        if (!month || !year) {
+            return res.status(400).json({
+                success: false,
+                message: 'Month and year are required'
+            });
+        }
+
+        const salaryRecords = await Salary.find({
+            month: parseInt(month),
+            year: parseInt(year)
+        })
+            .populate('userId', 'name username email hourlyRate')
+            .sort({ 'userId.name': 1 });
+
+        // Calculate totals
+        const totalHours = salaryRecords.reduce((sum, record) => sum + record.totalHours, 0);
+        const totalSalary = salaryRecords.reduce((sum, record) => sum + record.totalSalary, 0);
+        const totalBonus = salaryRecords.reduce((sum, record) => sum + record.bonus, 0);
+        const totalDeduction = salaryRecords.reduce((sum, record) => sum + record.deduction, 0);
+        const totalFinalSalary = salaryRecords.reduce((sum, record) => sum + record.finalSalary, 0);
+
+        res.json({
+            success: true,
+            data: {
+                month: parseInt(month),
+                year: parseInt(year),
+                salaries: salaryRecords.map(record => ({
+                    id: record._id,
+                    userId: record.userId._id,
+                    userName: record.userId.name,
+                    userEmail: record.userId.email,
+                    hourlyRate: record.hourlyRate,
+                    totalHours: record.totalHours,
+                    totalSalary: record.totalSalary,
+                    bonus: record.bonus,
+                    bonusReason: record.bonusReason,
+                    deduction: record.deduction,
+                    deductionReason: record.deductionReason,
+                    finalSalary: record.finalSalary,
+                    dailyRecordsCount: record.dailyRecords.length,
+                    createdAt: record.createdAt,
+                    updatedAt: record.updatedAt
+                })),
+                summary: {
+                    totalEmployees: salaryRecords.length,
+                    totalHours: Math.round(totalHours * 100) / 100,
+                    totalSalary: Math.round(totalSalary),
+                    totalBonus: Math.round(totalBonus),
+                    totalDeduction: Math.round(totalDeduction),
+                    totalFinalSalary: Math.round(totalFinalSalary)
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error in getDetailedMonthlySalaries:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error: ' + error.message
+        });
+    }
+};
+
 module.exports = {
     calculateSalary,
     getUserSalaryHistory,
@@ -547,5 +878,10 @@ module.exports = {
     updateHourlyRate,
     getUsersForSalary,
     recalculateMonth,
-    updateSalaryForMonth
+    updateSalaryForMonth,
+    getDetailedSalaryTable,
+    updateDailySalary,
+    updateBonus,
+    updateDeduction,
+    getDetailedMonthlySalaries
 };
