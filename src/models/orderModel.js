@@ -1,157 +1,153 @@
-const { getPgPoolAsync } = require('../config/db');
+const { supabase } = require('../config/supabase');
 
-const ORDER_STATUSES = ['chua_rep', 'giu_don', 'di_don', 'gap', 'hoan_thanh', 'warning'];
+const VALID_STATUSES = ['chua_rep', 'giu_don', 'di_don', 'gap', 'hoan_thanh', 'warning'];
 const STATUS_ORDER = ['gap', 'di_don', 'chua_rep', 'giu_don', 'warning', 'hoan_thanh'];
 
-function normalizeStatus(status) {
-    if (!status) return null;
-    const s = String(status).trim();
-    return ORDER_STATUSES.includes(s) ? s : null;
-}
+async function listOrders({ start, end, search, statusList, page = 1, limit = 20 }) {
+    const offset = (Math.max(1, Number(page)) - 1) * Math.max(1, Number(limit));
+    const rangeEnd = offset + Math.max(1, Number(limit)) - 1;
 
-function parseStatusesParam(statusParam) {
-    if (!statusParam) return [];
-    return String(statusParam)
-        .split(',')
-        .map((x) => x.trim())
-        .map(normalizeStatus)
-        .filter(Boolean);
-}
+    let base = supabase
+        .from('orders')
+        .select('*', { count: 'exact' })
+        .gte('created_at', start)
+        .lte('created_at', end)
+        .order('created_at', { ascending: false });
 
-function getByField(by) {
-    return by === 'live_date' ? 'live_date' : 'created_at';
-}
-
-async function listOrders({ start, end, page = 1, limit = 20, search, status, by }) {
-    const pool = await getPgPoolAsync();
-    const client = await pool.connect();
-    try {
-        const byField = getByField(by);
-        const statuses = parseStatusesParam(status);
-
-        const where = [];
-        const params = [];
-        let idx = 1;
-
-        if (start) { where.push(`${byField} >= $${idx++}`); params.push(start); }
-        if (end) { where.push(`${byField} <= $${idx++}`); params.push(end); }
-        if (search) {
-            where.push(`(customer_username ILIKE $${idx} OR CAST(id AS TEXT) ILIKE $${idx})`);
-            params.push(`%${search}%`);
-            idx++;
-        }
-        if (statuses.length > 0) {
-            where.push(`status = ANY($${idx++})`);
-            params.push(statuses);
-        }
-
-        const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-
-        const countSql = `SELECT COUNT(*)::int AS total FROM orders ${whereSql}`;
-        const totalRes = await client.query(countSql, params);
-        const total = totalRes.rows[0]?.total || 0;
-
-        const pageNum = Math.max(1, parseInt(page, 10) || 1);
-        const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
-        const offset = (pageNum - 1) * limitNum;
-
-        const dataSql = `
-            SELECT id, customer_username, total_amount, status, live_date, created_at
-            FROM orders
-            ${whereSql}
-            ORDER BY ${byField} DESC
-            LIMIT ${limitNum} OFFSET ${offset}
-        `;
-        const dataRes = await client.query(dataSql, params);
-
-        // statusCounts for fixed set
-        const counts = await Promise.all(
-            STATUS_ORDER.map(async (st) => {
-                const whereForStatus = whereSql
-                    ? `${whereSql} AND status = $${params.length + 1}`
-                    : `WHERE status = $${params.length + 1}`;
-                const cRes = await client.query(
-                    `SELECT COUNT(*)::int AS count FROM orders ${whereForStatus}`,
-                    [...params, st]
-                );
-                return { status: st, count: cRes.rows[0]?.count || 0 };
-            })
+    if (search && String(search).trim() !== '') {
+        const q = `%${search}%`;
+        // Search on orders.customer_username OR exists order_items with product_name/content matching
+        base = base.or(
+            `customer_username.ilike.${q},id.in.(select order_id from order_items where product_name.ilike.${q} or content.ilike.${q})`
         );
-
-        return { data: dataRes.rows, statusCounts: counts, page: pageNum, limit: limitNum, total };
-    } finally {
-        client.release();
     }
+
+    if (statusList && statusList.length > 0) {
+        const valid = statusList.filter(s => VALID_STATUSES.includes(s));
+        if (valid.length > 0) {
+            base = base.in('status', valid);
+        }
+    }
+
+    const dataQuery = base.range(offset, rangeEnd);
+    const { data, error, count } = await dataQuery;
+    if (error) throw error;
+
+    return { data, total: count || 0 };
+}
+
+async function getStatusCounts({ start, end, search }) {
+    // We compute counts per status with same time + search filters, but without status filter itself
+    const counts = {};
+    for (const st of STATUS_ORDER) counts[st] = 0;
+
+    let base = supabase
+        .from('orders')
+        .select('status')
+        .gte('created_at', start)
+        .lte('created_at', end);
+
+    if (search && String(search).trim() !== '') {
+        const q = `%${search}%`;
+        base = base.or(
+            `customer_username.ilike.${q},id.in.(select order_id from order_items where product_name.ilike.${q} or content.ilike.${q})`
+        );
+    }
+
+    const { data, error } = await base;
+    if (error) throw error;
+
+    for (const row of data || []) {
+        if (counts[row.status] === undefined) counts[row.status] = 0;
+        counts[row.status] += 1;
+    }
+
+    return STATUS_ORDER.map(status => ({ status, count: counts[status] || 0 }));
 }
 
 async function getOrderById(orderId) {
-    const pool = await getPgPoolAsync();
-    const { rows } = await pool.query(
-        'SELECT id, customer_username, total_amount, status, live_date, created_at FROM orders WHERE id = $1',
-        [orderId]
-    );
-    return rows[0] || null;
+    const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+    if (error) throw error;
+    return data;
 }
 
-async function getOrderItems(orderId) {
-    const pool = await getPgPoolAsync();
-    const { rows } = await pool.query(
-        'SELECT id, order_id, product_name, content, quantity, price, unit_price, created_at FROM order_items WHERE order_id = $1 ORDER BY created_at ASC',
-        [orderId]
-    );
-    return rows;
+async function getItemsByOrderId(orderId) {
+    const { data, error } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: true });
+    if (error) throw error;
+    return data || [];
 }
 
 async function updateOrderStatus(orderId, status) {
-    const pool = await getPgPoolAsync();
-    const s = normalizeStatus(status);
-    if (!s) return null;
-    const { rows } = await pool.query(
-        'UPDATE orders SET status = $1 WHERE id = $2 RETURNING id, status',
-        [s, orderId]
-    );
-    return rows[0] || null;
+    if (!VALID_STATUSES.includes(status)) {
+        const err = new Error('Invalid status');
+        err.statusCode = 400;
+        throw err;
+    }
+    const { data, error } = await supabase
+        .from('orders')
+        .update({ status })
+        .eq('id', orderId)
+        .select('id,status')
+        .single();
+    if (error) throw error;
+    return data;
 }
 
 async function deleteOrder(orderId) {
-    const pool = await getPgPoolAsync();
-    const { rowCount } = await pool.query('DELETE FROM orders WHERE id = $1', [orderId]);
-    return rowCount > 0;
+    const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+    if (error) throw error;
+    return true;
 }
 
 async function bulkDeleteOrders(ids) {
-    const pool = getPgPool();
-    const client = await pool.connect();
     const results = [];
-    try {
-        await client.query('BEGIN');
-        for (const id of ids) {
-            try {
-                const res = await client.query('DELETE FROM orders WHERE id = $1', [id]);
-                results.push({ orderId: id, success: res.rowCount > 0, message: res.rowCount ? undefined : 'Not found' });
-            } catch (e) {
-                results.push({ orderId: id, success: false, message: e.message });
-            }
+    for (const id of ids) {
+        try {
+            await deleteOrder(id);
+            results.push({ orderId: id, success: true });
+        } catch (e) {
+            results.push({ orderId: id, success: false, message: e.message });
         }
-        await client.query('COMMIT');
-    } catch (e) {
-        await client.query('ROLLBACK');
-        throw e;
-    } finally {
-        client.release();
     }
     return results;
 }
 
+async function findOrderFromCommentsLookup(username, liveDate) {
+    let query = supabase
+        .from('orders')
+        .select('*')
+        .eq('customer_username', username)
+        .eq('live_date', liveDate)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data && data[0]) || null;
+}
+
 module.exports = {
-    ORDER_STATUSES,
+    VALID_STATUSES,
     STATUS_ORDER,
     listOrders,
+    getStatusCounts,
     getOrderById,
-    getOrderItems,
+    getItemsByOrderId,
     updateOrderStatus,
     deleteOrder,
-    bulkDeleteOrders
+    bulkDeleteOrders,
+    findOrderFromCommentsLookup
 };
 
 

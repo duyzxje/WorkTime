@@ -1,131 +1,150 @@
 const {
-    ORDER_STATUSES,
     STATUS_ORDER,
     listOrders,
+    getStatusCounts,
     getOrderById,
-    getOrderItems,
+    getItemsByOrderId,
     updateOrderStatus,
     deleteOrder,
-    bulkDeleteOrders
+    bulkDeleteOrders,
+    findOrderFromCommentsLookup
 } = require('../models/orderModel');
 
-function parseDate(value) {
-    if (!value) return null;
-    const d = new Date(value);
-    return isNaN(d.getTime()) ? null : d.toISOString();
-}
-
+// GET /orders
 const getOrders = async (req, res) => {
     try {
-        const { start, end, page, limit, search, status, by } = req.query;
-        const startIso = parseDate(start);
-        const endIso = parseDate(end);
+        const {
+            start,
+            end,
+            page = '1',
+            limit = '20',
+            search = '',
+            status = ''
+        } = req.query;
 
-        const result = await listOrders({ start: startIso, end: endIso, page, limit, search, status, by });
-        // Ensure fixed status order with zeros
-        const countsByStatus = new Map(result.statusCounts.map(c => [c.status, c.count]));
-        const statusCounts = STATUS_ORDER.map(st => ({ status: st, count: countsByStatus.get(st) || 0 }));
+        if (!start || !end) {
+            return res.status(400).json({
+                success: false,
+                message: 'start and end are required ISO datetime'
+            });
+        }
 
-        res.json({
-            data: result.data,
-            statusCounts,
-            page: result.page,
-            limit: result.limit,
-            total: result.total
+        const statusList = String(status)
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean);
+
+        const [listResult, counts] = await Promise.all([
+            listOrders({ start, end, search, statusList, page, limit }),
+            getStatusCounts({ start, end, search })
+        ]);
+
+        return res.json({
+            data: listResult.data,
+            statusCounts: counts,
+            page: Number(page),
+            limit: Number(limit),
+            total: listResult.total
         });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ success: false, message: e.message });
+    } catch (error) {
+        console.error('getOrders error:', error);
+        return res.status(500).json({ success: false, message: error.message });
     }
 };
 
-const getOrder = async (req, res) => {
+// GET /orders/:orderId
+const getOrderDetail = async (req, res) => {
     try {
         const { orderId } = req.params;
         const order = await getOrderById(orderId);
-        if (!order) return res.status(404).json({ success: false, message: 'Not found' });
-        const items = await getOrderItems(orderId);
-        res.json({ order, items });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ success: false, message: e.message });
+        const items = await getItemsByOrderId(orderId);
+        return res.json({ order, items });
+    } catch (error) {
+        console.error('getOrderDetail error:', error);
+        return res.status(404).json({ success: false, message: 'Order not found' });
     }
 };
 
-const getOrderItemsOnly = async (req, res) => {
+// GET /orders/:orderId/items
+const getOrderItems = async (req, res) => {
     try {
         const { orderId } = req.params;
-        const items = await getOrderItems(orderId);
-        res.json({ data: items });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ success: false, message: e.message });
+        const items = await getItemsByOrderId(orderId);
+        return res.json({ data: items });
+    } catch (error) {
+        console.error('getOrderItems error:', error);
+        return res.status(500).json({ success: false, message: error.message });
     }
 };
 
+// PATCH /orders/:orderId/status
 const patchOrderStatus = async (req, res) => {
     try {
         const { orderId } = req.params;
         const { status } = req.body || {};
-        if (!ORDER_STATUSES.includes(status)) {
-            return res.status(400).json({ success: false, message: 'Invalid status' });
-        }
         const updated = await updateOrderStatus(orderId, status);
-        if (!updated) return res.status(404).json({ success: false, message: 'Not found' });
-        res.json({ success: true, orderId: updated.id, status: updated.status });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ success: false, message: e.message });
+        return res.json({ success: true, orderId: updated.id, status: updated.status });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        console.error('patchOrderStatus error:', error);
+        return res.status(statusCode).json({ success: false, message: error.message });
     }
 };
 
-const deleteOrderHandler = async (req, res) => {
+// POST /orders/from-comments  (lookup)
+const createOrdersFromComments = async (req, res) => {
+    try {
+        const { username, liveDate } = req.body || {};
+        if (!username || !liveDate) {
+            return res.status(400).json({ success: false, message: 'username and liveDate are required' });
+        }
+        const order = await findOrderFromCommentsLookup(username, liveDate);
+        if (!order) {
+            return res.json({ success: false, order_id: 0, total: 0, items: [], message: 'Order not found' });
+        }
+        const items = await getItemsByOrderId(order.id);
+        return res.json({ success: true, order_id: order.id, total: order.total_amount, items });
+    } catch (error) {
+        console.error('createOrdersFromComments error:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// DELETE /orders/:orderId
+const removeOrder = async (req, res) => {
     try {
         const { orderId } = req.params;
-        const ok = await deleteOrder(orderId);
-        if (!ok) return res.status(404).json({ success: false, message: 'Not found' });
-        res.json({ success: true });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ success: false, message: e.message });
+        await deleteOrder(orderId);
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('removeOrder error:', error);
+        return res.status(500).json({ success: false, message: error.message });
     }
 };
 
-const bulkDeleteHandler = async (req, res) => {
+// POST /orders/bulk-delete
+const bulkDelete = async (req, res) => {
     try {
         const { ids } = req.body || {};
         if (!Array.isArray(ids) || ids.length === 0) {
             return res.status(400).json({ success: false, message: 'ids must be a non-empty array' });
         }
         const results = await bulkDeleteOrders(ids);
-        res.json(results);
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ success: false, message: e.message });
-    }
-};
-
-// Placeholder for from-comments; implementation depends on data source
-const createFromComments = async (req, res) => {
-    try {
-        const { username, liveDate } = req.body || {};
-        if (!username) return res.status(400).json({ success: false, message: 'username is required' });
-        // Not implemented: requires comment parsing source; return stub
-        res.json({ success: true, order_id: 0, total: 0, items: [] });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ success: false, message: e.message });
+        return res.json(results);
+    } catch (error) {
+        console.error('bulkDelete error:', error);
+        return res.status(500).json({ success: false, message: error.message });
     }
 };
 
 module.exports = {
     getOrders,
-    getOrder,
-    getOrderItemsOnly,
+    getOrderDetail,
+    getOrderItems,
     patchOrderStatus,
-    deleteOrderHandler,
-    bulkDeleteHandler,
-    createFromComments
+    createOrdersFromComments,
+    removeOrder,
+    bulkDelete
 };
 
 

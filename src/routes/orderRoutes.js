@@ -1,25 +1,25 @@
 const express = require('express');
 const router = express.Router();
-const { protect, admin } = require('../middleware/authMiddleware');
+
 const {
     getOrders,
-    getOrder,
-    getOrderItemsOnly,
+    getOrderDetail,
+    getOrderItems,
     patchOrderStatus,
-    deleteOrderHandler,
-    bulkDeleteHandler,
-    createFromComments
+    createOrdersFromComments,
+    removeOrder,
+    bulkDelete
 } = require('../controllers/orderController');
 
-// Read endpoints can be protected or public; keeping protected consistent with others
-router.get('/', protect, getOrders);
-router.get('/:orderId', protect, getOrder);
-router.get('/:orderId/items', protect, getOrderItemsOnly);
+// No auth limits as requested
 
-router.patch('/:orderId/status', protect, admin, patchOrderStatus);
-router.delete('/:orderId', protect, admin, deleteOrderHandler);
-router.post('/bulk-delete', protect, admin, bulkDeleteHandler);
-router.post('/from-comments', protect, admin, createFromComments);
+router.get('/', getOrders);
+router.get('/:orderId', getOrderDetail);
+router.get('/:orderId/items', getOrderItems);
+router.patch('/:orderId/status', patchOrderStatus);
+router.post('/from-comments', createOrdersFromComments);
+router.delete('/:orderId', removeOrder);
+router.post('/bulk-delete', bulkDelete);
 
 module.exports = router;
 
