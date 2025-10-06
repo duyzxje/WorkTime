@@ -1,4 +1,7 @@
 const express = require('express');
+const dns = require('dns');
+// Force IPv4 to avoid IPv6 ENETUNREACH in hosting environments without IPv6 egress
+try { dns.setDefaultResultOrder('ipv4first'); } catch (_) { }
 const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
