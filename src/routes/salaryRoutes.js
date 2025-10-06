@@ -11,8 +11,10 @@ const {
     updateSalaryForMonth,
     getDetailedSalaryTable,
     updateDailySalary,
-    updateBonus,
-    updateDeduction,
+    addBonus,
+    removeBonus,
+    addDeduction,
+    removeDeduction,
     getDetailedMonthlySalaries
 } = require('../controllers/salaryController');
 const { protect, admin } = require('../middleware/authMiddleware');
@@ -67,15 +69,25 @@ router.get('/detailed/:userId/:month/:year', protect, admin, getDetailedSalaryTa
 // @access  Private/Admin
 router.put('/daily/:salaryId', protect, admin, updateDailySalary);
 
-// @route   PUT /api/salary/bonus/:salaryId
-// @desc    Add or update bonus for salary record
+// @route   POST /api/salary/bonus/:salaryId
+// @desc    Add bonus entry for salary record
 // @access  Private/Admin
-router.put('/bonus/:salaryId', protect, admin, updateBonus);
+router.post('/bonus/:salaryId', protect, admin, addBonus);
 
-// @route   PUT /api/salary/deduction/:salaryId
-// @desc    Add or update deduction for salary record
+// @route   DELETE /api/salary/bonus/:salaryId/:bonusId
+// @desc    Remove bonus entry from salary record
 // @access  Private/Admin
-router.put('/deduction/:salaryId', protect, admin, updateDeduction);
+router.delete('/bonus/:salaryId/:bonusId', protect, admin, removeBonus);
+
+// @route   POST /api/salary/deduction/:salaryId
+// @desc    Add deduction entry for salary record
+// @access  Private/Admin
+router.post('/deduction/:salaryId', protect, admin, addDeduction);
+
+// @route   DELETE /api/salary/deduction/:salaryId/:deductionId
+// @desc    Remove deduction entry from salary record
+// @access  Private/Admin
+router.delete('/deduction/:salaryId/:deductionId', protect, admin, removeDeduction);
 
 // @route   GET /api/salary/detailed-monthly/:month/:year
 // @desc    Get all detailed salary records for a month (admin overview)

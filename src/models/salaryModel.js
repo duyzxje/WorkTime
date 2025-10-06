@@ -42,37 +42,51 @@ const salarySchema = new mongoose.Schema({
             type: Number,
             default: 0
         },
-        adjustedSalary: {
-            type: Number,
-            default: 0
-        },
-        salaryAdjustmentReason: {
-            type: String,
-            default: ''
-        },
         checkInTime: Date,
         checkOutTime: Date,
         isValid: Boolean,
         notes: String
     }],
-    // Tiền thưởng và lý do
-    bonus: {
-        type: Number,
-        default: 0
-    },
-    bonusReason: {
-        type: String,
-        default: ''
-    },
-    // Tiền trừ và lý do
-    deduction: {
-        type: Number,
-        default: 0
-    },
-    deductionReason: {
-        type: String,
-        default: ''
-    },
+    // Danh sách tiền thưởng
+    bonuses: [{
+        _id: {
+            type: mongoose.Schema.Types.ObjectId,
+            default: mongoose.Types.ObjectId
+        },
+        amount: {
+            type: Number,
+            required: true,
+            min: 0
+        },
+        reason: {
+            type: String,
+            required: true
+        },
+        createdAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
+    // Danh sách tiền trừ
+    deductions: [{
+        _id: {
+            type: mongoose.Schema.Types.ObjectId,
+            default: mongoose.Types.ObjectId
+        },
+        amount: {
+            type: Number,
+            required: true,
+            min: 0
+        },
+        reason: {
+            type: String,
+            required: true
+        },
+        createdAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
     // Tổng lương cuối cùng (bao gồm thưởng và trừ)
     finalSalary: {
         type: Number,

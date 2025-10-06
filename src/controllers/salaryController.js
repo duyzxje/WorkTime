@@ -261,6 +261,20 @@ const exportSalaryToExcel = async (req, res) => {
         ];
 
         // Add data to daily sheet
+        const formatTimeHHmm = (dateLike) => {
+            if (!dateLike) return '';
+            const d = new Date(dateLike);
+            if (isNaN(d.getTime())) return '';
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            return `${hh}:${mm}`;
+        };
+
+        const formatCurrencyVND = (value) => {
+            if (value === null || value === undefined || isNaN(Number(value))) return '';
+            return Number(value).toLocaleString('vi-VN') + 'đ';
+        };
+
         salaryRecord.dailyRecords.forEach(record => {
             const date = new Date(record.date);
             const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -268,10 +282,10 @@ const exportSalaryToExcel = async (req, res) => {
             dailySheet.addRow({
                 date: date.toISOString().split('T')[0],
                 dayOfWeek: dayNames[date.getDay()],
-                checkInTime: record.checkInTime || '',
-                checkOutTime: record.checkOutTime || '',
+                checkInTime: formatTimeHHmm(record.checkInTime),
+                checkOutTime: formatTimeHHmm(record.checkOutTime),
                 workHours: record.workHours,
-                dailySalary: record.dailySalary + 'đ',
+                dailySalary: formatCurrencyVND(record.dailySalary),
                 isValid: record.isValid ? 'Có' : 'Không',
                 notes: record.notes || ''
             });
@@ -289,7 +303,8 @@ const exportSalaryToExcel = async (req, res) => {
         const summarySheet = workbook.addWorksheet('Tổng kết');
         summarySheet.columns = [
             { header: 'Thông tin', key: 'info', width: 25 },
-            { header: 'Giá trị', key: 'value', width: 25 }
+            { header: 'Giá trị', key: 'value', width: 25 },
+            { header: 'Lý do', key: 'reason', width: 30 }
         ];
 
         const monthNames = [
@@ -297,13 +312,47 @@ const exportSalaryToExcel = async (req, res) => {
             'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
         ];
 
+        // Calculate totals
+        const totalBonus = salaryRecord.bonuses.reduce((sum, bonus) => sum + bonus.amount, 0);
+        const totalDeduction = salaryRecord.deductions.reduce((sum, deduction) => sum + deduction.amount, 0);
+
+        // Add basic info rows
         summarySheet.addRows([
-            { info: 'Tên nhân viên', value: salaryRecord.userId.name },
-            { info: 'Tháng', value: `${monthNames[month - 1]} ${year}` },
-            { info: 'Mức lương/giờ', value: salaryRecord.hourlyRate + 'đ' },
-            { info: 'Tổng số ngày làm', value: salaryRecord.dailyRecords.length },
-            { info: 'Tổng số giờ làm', value: salaryRecord.totalHours + ' giờ' },
-            { info: 'Tổng lương', value: salaryRecord.totalSalary + 'đ' }
+            { info: 'Tên nhân viên', value: salaryRecord.userId.name, reason: '' },
+            { info: 'Tháng', value: `${monthNames[month - 1]} ${year}`, reason: '' },
+            { info: 'Mức lương/giờ', value: formatCurrencyVND(salaryRecord.hourlyRate), reason: '' },
+            { info: 'Tổng số ngày làm', value: salaryRecord.dailyRecords.length, reason: '' },
+            { info: 'Tổng số giờ làm', value: salaryRecord.totalHours + ' giờ', reason: '' },
+            { info: 'Tổng lương', value: formatCurrencyVND(salaryRecord.totalSalary), reason: '' }
+        ]);
+
+        // Add bonus entries
+        if (salaryRecord.bonuses && salaryRecord.bonuses.length > 0) {
+            salaryRecord.bonuses.forEach((bonus, index) => {
+                summarySheet.addRow({
+                    info: `Tiền cộng ${index + 1}`,
+                    value: formatCurrencyVND(bonus.amount),
+                    reason: bonus.reason
+                });
+            });
+        }
+
+        // Add deduction entries
+        if (salaryRecord.deductions && salaryRecord.deductions.length > 0) {
+            salaryRecord.deductions.forEach((deduction, index) => {
+                summarySheet.addRow({
+                    info: `Tiền trừ ${index + 1}`,
+                    value: formatCurrencyVND(deduction.amount),
+                    reason: deduction.reason
+                });
+            });
+        }
+
+        // Add totals
+        summarySheet.addRows([
+            { info: 'Tổng cộng', value: formatCurrencyVND(totalBonus), reason: '' },
+            { info: 'Tổng trừ', value: formatCurrencyVND(totalDeduction), reason: '' },
+            { info: 'Lương cuối cùng', value: formatCurrencyVND(salaryRecord.finalSalary), reason: '' }
         ]);
 
         // Style the summary sheet
@@ -575,8 +624,9 @@ const getDetailedSalaryTable = async (req, res) => {
             });
         }
 
-        // Calculate final salary including bonus and deduction
-        const finalSalary = salaryRecord.totalSalary + salaryRecord.bonus - salaryRecord.deduction;
+        // Calculate totals
+        const totalBonus = salaryRecord.bonuses.reduce((sum, bonus) => sum + bonus.amount, 0);
+        const totalDeduction = salaryRecord.deductions.reduce((sum, deduction) => sum + deduction.amount, 0);
 
         res.json({
             success: true,
@@ -591,17 +641,15 @@ const getDetailedSalaryTable = async (req, res) => {
                     year: salaryRecord.year,
                     totalHours: salaryRecord.totalHours,
                     totalSalary: salaryRecord.totalSalary,
-                    bonus: salaryRecord.bonus,
-                    bonusReason: salaryRecord.bonusReason,
-                    deduction: salaryRecord.deduction,
-                    deductionReason: salaryRecord.deductionReason,
-                    finalSalary: finalSalary,
+                    bonuses: salaryRecord.bonuses,
+                    deductions: salaryRecord.deductions,
+                    totalBonus,
+                    totalDeduction,
+                    finalSalary: salaryRecord.finalSalary,
                     dailyRecords: salaryRecord.dailyRecords.map(record => ({
                         date: record.date,
                         workHours: record.workHours,
                         dailySalary: record.dailySalary,
-                        adjustedSalary: record.adjustedSalary || 0,
-                        salaryAdjustmentReason: record.salaryAdjustmentReason || '',
                         checkInTime: record.checkInTime,
                         checkOutTime: record.checkOutTime,
                         isValid: record.isValid,
@@ -627,12 +675,19 @@ const getDetailedSalaryTable = async (req, res) => {
 const updateDailySalary = async (req, res) => {
     try {
         const { salaryId } = req.params;
-        const { date, adjustedSalary, salaryAdjustmentReason } = req.body;
+        const { date, dailySalary } = req.body;
 
-        if (!date || adjustedSalary === undefined || !salaryAdjustmentReason) {
+        if (!date || dailySalary === undefined) {
             return res.status(400).json({
                 success: false,
-                message: 'Date, adjusted salary, and adjustment reason are required'
+                message: 'Date and daily salary are required'
+            });
+        }
+
+        if (dailySalary < 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Daily salary must be non-negative'
             });
         }
 
@@ -660,19 +715,21 @@ const updateDailySalary = async (req, res) => {
         }
 
         // Update the daily record
-        salaryRecord.dailyRecords[dailyRecordIndex].adjustedSalary = adjustedSalary;
-        salaryRecord.dailyRecords[dailyRecordIndex].salaryAdjustmentReason = salaryAdjustmentReason;
+        salaryRecord.dailyRecords[dailyRecordIndex].dailySalary = Math.round(dailySalary);
 
-        // Recalculate total salary
+        // Recalculate total salary from all daily records
         let newTotalSalary = 0;
         salaryRecord.dailyRecords.forEach(record => {
-            const dailyAmount = record.adjustedSalary > 0 ? record.adjustedSalary : record.dailySalary;
-            newTotalSalary += dailyAmount;
+            newTotalSalary += record.dailySalary;
         });
+
+        // Calculate total bonuses and deductions
+        const totalBonus = salaryRecord.bonuses.reduce((sum, bonus) => sum + bonus.amount, 0);
+        const totalDeduction = salaryRecord.deductions.reduce((sum, deduction) => sum + deduction.amount, 0);
 
         // Update salary record
         salaryRecord.totalSalary = Math.round(newTotalSalary);
-        salaryRecord.finalSalary = salaryRecord.totalSalary + salaryRecord.bonus - salaryRecord.deduction;
+        salaryRecord.finalSalary = salaryRecord.totalSalary + totalBonus - totalDeduction;
 
         await salaryRecord.save();
 
@@ -681,7 +738,13 @@ const updateDailySalary = async (req, res) => {
             message: 'Daily salary updated successfully',
             data: {
                 salary: salaryRecord,
-                updatedDailyRecord: salaryRecord.dailyRecords[dailyRecordIndex]
+                updatedDailyRecord: salaryRecord.dailyRecords[dailyRecordIndex],
+                summary: {
+                    totalSalary: salaryRecord.totalSalary,
+                    totalBonus,
+                    totalDeduction,
+                    finalSalary: salaryRecord.finalSalary
+                }
             }
         });
     } catch (error) {
@@ -693,22 +756,22 @@ const updateDailySalary = async (req, res) => {
     }
 };
 
-// @desc    Add or update bonus for salary record
-// @route   PUT /api/salary/bonus/:salaryId
+// @desc    Add bonus entry for salary record
+// @route   POST /api/salary/bonus/:salaryId
 // @access  Private/Admin
-const updateBonus = async (req, res) => {
+const addBonus = async (req, res) => {
     try {
         const { salaryId } = req.params;
-        const { bonus, bonusReason } = req.body;
+        const { amount, reason } = req.body;
 
-        if (bonus === undefined || !bonusReason) {
+        if (amount === undefined || !reason) {
             return res.status(400).json({
                 success: false,
                 message: 'Bonus amount and reason are required'
             });
         }
 
-        if (bonus < 0) {
+        if (amount <= 0) {
             return res.status(400).json({
                 success: false,
                 message: 'Bonus amount must be positive'
@@ -724,22 +787,38 @@ const updateBonus = async (req, res) => {
             });
         }
 
-        // Update bonus
-        salaryRecord.bonus = bonus;
-        salaryRecord.bonusReason = bonusReason;
-        salaryRecord.finalSalary = salaryRecord.totalSalary + salaryRecord.bonus - salaryRecord.deduction;
+        // Add new bonus entry
+        const newBonus = {
+            amount: Math.round(amount),
+            reason: reason.trim()
+        };
+        salaryRecord.bonuses.push(newBonus);
+
+        // Calculate total bonuses and deductions
+        const totalBonus = salaryRecord.bonuses.reduce((sum, bonus) => sum + bonus.amount, 0);
+        const totalDeduction = salaryRecord.deductions.reduce((sum, deduction) => sum + deduction.amount, 0);
+
+        // Update final salary
+        salaryRecord.finalSalary = salaryRecord.totalSalary + totalBonus - totalDeduction;
 
         await salaryRecord.save();
 
         res.json({
             success: true,
-            message: 'Bonus updated successfully',
+            message: 'Bonus added successfully',
             data: {
-                salary: salaryRecord
+                salary: salaryRecord,
+                newBonus: newBonus,
+                summary: {
+                    totalSalary: salaryRecord.totalSalary,
+                    totalBonus,
+                    totalDeduction,
+                    finalSalary: salaryRecord.finalSalary
+                }
             }
         });
     } catch (error) {
-        console.error('Error in updateBonus:', error);
+        console.error('Error in addBonus:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error: ' + error.message
@@ -747,22 +826,82 @@ const updateBonus = async (req, res) => {
     }
 };
 
-// @desc    Add or update deduction for salary record
-// @route   PUT /api/salary/deduction/:salaryId
+// @desc    Remove bonus entry from salary record
+// @route   DELETE /api/salary/bonus/:salaryId/:bonusId
 // @access  Private/Admin
-const updateDeduction = async (req, res) => {
+const removeBonus = async (req, res) => {
+    try {
+        const { salaryId, bonusId } = req.params;
+
+        // Get salary record
+        const salaryRecord = await Salary.findById(salaryId);
+        if (!salaryRecord) {
+            return res.status(404).json({
+                success: false,
+                message: 'Salary record not found'
+            });
+        }
+
+        // Find and remove bonus entry
+        const bonusIndex = salaryRecord.bonuses.findIndex(bonus => bonus._id.toString() === bonusId);
+        if (bonusIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: 'Bonus entry not found'
+            });
+        }
+
+        const removedBonus = salaryRecord.bonuses[bonusIndex];
+        salaryRecord.bonuses.splice(bonusIndex, 1);
+
+        // Calculate total bonuses and deductions
+        const totalBonus = salaryRecord.bonuses.reduce((sum, bonus) => sum + bonus.amount, 0);
+        const totalDeduction = salaryRecord.deductions.reduce((sum, deduction) => sum + deduction.amount, 0);
+
+        // Update final salary
+        salaryRecord.finalSalary = salaryRecord.totalSalary + totalBonus - totalDeduction;
+
+        await salaryRecord.save();
+
+        res.json({
+            success: true,
+            message: 'Bonus removed successfully',
+            data: {
+                salary: salaryRecord,
+                removedBonus: removedBonus,
+                summary: {
+                    totalSalary: salaryRecord.totalSalary,
+                    totalBonus,
+                    totalDeduction,
+                    finalSalary: salaryRecord.finalSalary
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error in removeBonus:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error: ' + error.message
+        });
+    }
+};
+
+// @desc    Add deduction entry for salary record
+// @route   POST /api/salary/deduction/:salaryId
+// @access  Private/Admin
+const addDeduction = async (req, res) => {
     try {
         const { salaryId } = req.params;
-        const { deduction, deductionReason } = req.body;
+        const { amount, reason } = req.body;
 
-        if (deduction === undefined || !deductionReason) {
+        if (amount === undefined || !reason) {
             return res.status(400).json({
                 success: false,
                 message: 'Deduction amount and reason are required'
             });
         }
 
-        if (deduction < 0) {
+        if (amount <= 0) {
             return res.status(400).json({
                 success: false,
                 message: 'Deduction amount must be positive'
@@ -778,22 +917,98 @@ const updateDeduction = async (req, res) => {
             });
         }
 
-        // Update deduction
-        salaryRecord.deduction = deduction;
-        salaryRecord.deductionReason = deductionReason;
-        salaryRecord.finalSalary = salaryRecord.totalSalary + salaryRecord.bonus - salaryRecord.deduction;
+        // Add new deduction entry
+        const newDeduction = {
+            amount: Math.round(amount),
+            reason: reason.trim()
+        };
+        salaryRecord.deductions.push(newDeduction);
+
+        // Calculate total bonuses and deductions
+        const totalBonus = salaryRecord.bonuses.reduce((sum, bonus) => sum + bonus.amount, 0);
+        const totalDeduction = salaryRecord.deductions.reduce((sum, deduction) => sum + deduction.amount, 0);
+
+        // Update final salary
+        salaryRecord.finalSalary = salaryRecord.totalSalary + totalBonus - totalDeduction;
 
         await salaryRecord.save();
 
         res.json({
             success: true,
-            message: 'Deduction updated successfully',
+            message: 'Deduction added successfully',
             data: {
-                salary: salaryRecord
+                salary: salaryRecord,
+                newDeduction: newDeduction,
+                summary: {
+                    totalSalary: salaryRecord.totalSalary,
+                    totalBonus,
+                    totalDeduction,
+                    finalSalary: salaryRecord.finalSalary
+                }
             }
         });
     } catch (error) {
-        console.error('Error in updateDeduction:', error);
+        console.error('Error in addDeduction:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error: ' + error.message
+        });
+    }
+};
+
+// @desc    Remove deduction entry from salary record
+// @route   DELETE /api/salary/deduction/:salaryId/:deductionId
+// @access  Private/Admin
+const removeDeduction = async (req, res) => {
+    try {
+        const { salaryId, deductionId } = req.params;
+
+        // Get salary record
+        const salaryRecord = await Salary.findById(salaryId);
+        if (!salaryRecord) {
+            return res.status(404).json({
+                success: false,
+                message: 'Salary record not found'
+            });
+        }
+
+        // Find and remove deduction entry
+        const deductionIndex = salaryRecord.deductions.findIndex(deduction => deduction._id.toString() === deductionId);
+        if (deductionIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: 'Deduction entry not found'
+            });
+        }
+
+        const removedDeduction = salaryRecord.deductions[deductionIndex];
+        salaryRecord.deductions.splice(deductionIndex, 1);
+
+        // Calculate total bonuses and deductions
+        const totalBonus = salaryRecord.bonuses.reduce((sum, bonus) => sum + bonus.amount, 0);
+        const totalDeduction = salaryRecord.deductions.reduce((sum, deduction) => sum + deduction.amount, 0);
+
+        // Update final salary
+        salaryRecord.finalSalary = salaryRecord.totalSalary + totalBonus - totalDeduction;
+
+        await salaryRecord.save();
+
+        res.json({
+            success: true,
+            message: 'Deduction removed successfully',
+            data: {
+                salary: salaryRecord,
+                removedDeduction: removedDeduction,
+                summary: {
+                    totalSalary: salaryRecord.totalSalary,
+                    totalBonus,
+                    totalDeduction,
+                    finalSalary: salaryRecord.finalSalary
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error in removeDeduction:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error: ' + error.message
@@ -825,8 +1040,12 @@ const getDetailedMonthlySalaries = async (req, res) => {
         // Calculate totals
         const totalHours = salaryRecords.reduce((sum, record) => sum + record.totalHours, 0);
         const totalSalary = salaryRecords.reduce((sum, record) => sum + record.totalSalary, 0);
-        const totalBonus = salaryRecords.reduce((sum, record) => sum + record.bonus, 0);
-        const totalDeduction = salaryRecords.reduce((sum, record) => sum + record.deduction, 0);
+        const totalBonus = salaryRecords.reduce((sum, record) => {
+            return sum + record.bonuses.reduce((bonusSum, bonus) => bonusSum + bonus.amount, 0);
+        }, 0);
+        const totalDeduction = salaryRecords.reduce((sum, record) => {
+            return sum + record.deductions.reduce((deductionSum, deduction) => deductionSum + deduction.amount, 0);
+        }, 0);
         const totalFinalSalary = salaryRecords.reduce((sum, record) => sum + record.finalSalary, 0);
 
         res.json({
@@ -834,23 +1053,28 @@ const getDetailedMonthlySalaries = async (req, res) => {
             data: {
                 month: parseInt(month),
                 year: parseInt(year),
-                salaries: salaryRecords.map(record => ({
-                    id: record._id,
-                    userId: record.userId._id,
-                    userName: record.userId.name,
-                    userEmail: record.userId.email,
-                    hourlyRate: record.hourlyRate,
-                    totalHours: record.totalHours,
-                    totalSalary: record.totalSalary,
-                    bonus: record.bonus,
-                    bonusReason: record.bonusReason,
-                    deduction: record.deduction,
-                    deductionReason: record.deductionReason,
-                    finalSalary: record.finalSalary,
-                    dailyRecordsCount: record.dailyRecords.length,
-                    createdAt: record.createdAt,
-                    updatedAt: record.updatedAt
-                })),
+                salaries: salaryRecords.map(record => {
+                    const totalBonus = record.bonuses.reduce((sum, bonus) => sum + bonus.amount, 0);
+                    const totalDeduction = record.deductions.reduce((sum, deduction) => sum + deduction.amount, 0);
+
+                    return {
+                        id: record._id,
+                        userId: record.userId._id,
+                        userName: record.userId.name,
+                        userEmail: record.userId.email,
+                        hourlyRate: record.hourlyRate,
+                        totalHours: record.totalHours,
+                        totalSalary: record.totalSalary,
+                        bonuses: record.bonuses,
+                        deductions: record.deductions,
+                        totalBonus,
+                        totalDeduction,
+                        finalSalary: record.finalSalary,
+                        dailyRecordsCount: record.dailyRecords.length,
+                        createdAt: record.createdAt,
+                        updatedAt: record.updatedAt
+                    };
+                }),
                 summary: {
                     totalEmployees: salaryRecords.length,
                     totalHours: Math.round(totalHours * 100) / 100,
@@ -881,7 +1105,9 @@ module.exports = {
     updateSalaryForMonth,
     getDetailedSalaryTable,
     updateDailySalary,
-    updateBonus,
-    updateDeduction,
+    addBonus,
+    removeBonus,
+    addDeduction,
+    removeDeduction,
     getDetailedMonthlySalaries
 };
