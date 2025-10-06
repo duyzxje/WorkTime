@@ -500,16 +500,54 @@ const createManualRecord = async (req, res) => {
             notes
         } = req.body;
 
+        // Validation đầu vào
         if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-            return res.status(400).json({ message: 'Valid user ID is required' });
+            return res.status(400).json({
+                success: false,
+                message: 'Valid user ID is required'
+            });
         }
 
         if (!date || !checkInTime) {
-            return res.status(400).json({ message: 'Date and check-in time are required' });
+            return res.status(400).json({
+                success: false,
+                message: 'Date and check-in time are required'
+            });
+        }
+
+        // Kiểm tra user tồn tại
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Validation format thời gian
+        const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+        if (!timeRegex.test(checkInTime)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Check-in time must be in HH:MM format'
+            });
+        }
+
+        if (checkOutTime && !timeRegex.test(checkOutTime)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Check-out time must be in HH:MM format'
+            });
         }
 
         // Tạo đối tượng Date từ chuỗi ngày và giờ
         const baseDate = new Date(date);
+        if (isNaN(baseDate.getTime())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid date format'
+            });
+        }
 
         // Xử lý check-in time
         const [checkInHours, checkInMinutes] = checkInTime.split(':');
@@ -526,12 +564,17 @@ const createManualRecord = async (req, res) => {
             checkInTime: checkInDateTime,
             checkInLocation: {
                 type: 'Point',
-                coordinates: [0, 0], // Vị trí mặc định
+                coordinates: [0, 0], // Vị trí mặc định cho bản ghi thủ công
             },
             officeId,
             isValid: true, // Mặc định là hợp lệ với bản ghi thủ công
             notes: notes ? `Manual record: ${notes}` : 'Manual record',
+            status: 'checked-in' // Mặc định là checked-in
         };
+
+        let workDurationMinutes = 0;
+        let workTimeFormatted = '0h0m';
+        let dailySalary = 0;
 
         // Xử lý check-out time nếu có
         if (checkOutTime) {
@@ -543,10 +586,27 @@ const createManualRecord = async (req, res) => {
                 0, 0
             );
 
+            // Kiểm tra check-out phải sau check-in
+            if (checkOutDateTime <= checkInDateTime) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Check-out time must be after check-in time'
+                });
+            }
+
             // Tính thời gian làm việc
-            const workDurationMinutes = Math.round(
+            workDurationMinutes = Math.round(
                 (checkOutDateTime - checkInDateTime) / (1000 * 60)
             );
+
+            // Format thời gian làm việc
+            const hours = Math.floor(workDurationMinutes / 60);
+            const minutes = workDurationMinutes % 60;
+            workTimeFormatted = `${hours}h${minutes}m`;
+
+            // Tính lương ngày (giờ làm × mức lương/giờ)
+            const workHours = workDurationMinutes / 60;
+            dailySalary = Math.round(workHours * user.hourlyRate);
 
             // Cập nhật thông tin check-out
             attendanceData.checkOutTime = checkOutDateTime;
@@ -558,6 +618,22 @@ const createManualRecord = async (req, res) => {
             };
         }
 
+        // Kiểm tra xem đã có bản ghi chấm công cho ngày này chưa
+        const existingAttendance = await Attendance.findOne({
+            user: userId,
+            checkInTime: {
+                $gte: new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate()),
+                $lt: new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + 1)
+            }
+        });
+
+        if (existingAttendance) {
+            return res.status(400).json({
+                success: false,
+                message: 'Đã có bản ghi chấm công cho ngày này. Vui lòng cập nhật bản ghi hiện có.'
+            });
+        }
+
         // Tạo bản ghi mới
         const attendance = await Attendance.create(attendanceData);
 
@@ -567,12 +643,67 @@ const createManualRecord = async (req, res) => {
         }
 
         res.status(201).json({
+            success: true,
             message: 'Đã tạo bản ghi chấm công thủ công thành công',
-            attendance
+            data: {
+                attendance: {
+                    id: attendance._id,
+                    userId: attendance.user,
+                    userName: user.name,
+                    date: baseDate.toISOString().split('T')[0],
+                    checkInTime: checkInTime,
+                    checkOutTime: checkOutTime || null,
+                    workDuration: workDurationMinutes,
+                    workTimeFormatted: workTimeFormatted,
+                    dailySalary: dailySalary,
+                    status: attendance.status,
+                    isValid: attendance.isValid,
+                    notes: attendance.notes
+                },
+                summary: {
+                    workHours: (workDurationMinutes / 60).toFixed(2),
+                    hourlyRate: user.hourlyRate,
+                    dailySalary: dailySalary
+                }
+            }
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+        console.error('Error in createManualRecord:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error: ' + error.message
+        });
+    }
+};
+
+// @desc    Get users list for manual attendance (admin)
+// @route   GET /api/attendance/users-for-manual
+// @access  Private/Admin
+const getUsersForManualAttendance = async (req, res) => {
+    try {
+        const users = await User.find({ role: { $ne: 'admin' } })
+            .select('_id name username email hourlyRate')
+            .sort('name');
+
+        res.json({
+            success: true,
+            data: {
+                users: users.map(user => ({
+                    id: user._id,
+                    name: user.name,
+                    username: user.username,
+                    email: user.email,
+                    hourlyRate: user.hourlyRate
+                })),
+                count: users.length
+            }
+        });
+    } catch (error) {
+        console.error('Error in getUsersForManualAttendance:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error: ' + error.message
+        });
     }
 };
 
@@ -1036,6 +1167,7 @@ module.exports = {
     getAllAttendance,
     manualCheckOut,
     createManualRecord,
+    getUsersForManualAttendance,
     getAttendanceSummary,
     getMonthlyAttendanceSummary,
     updateAttendanceRecord,

@@ -6,6 +6,7 @@ const {
     getAllAttendance,
     manualCheckOut,
     createManualRecord,
+    getUsersForManualAttendance,
     getAttendanceSummary,
     getMonthlyAttendanceSummary,
     updateAttendanceRecord,
@@ -24,6 +25,7 @@ router.get('/:userId/summary', getAttendanceSummary);
 
 // Admin only routes
 router.get('/all', protect, admin, getAllAttendance);
+router.get('/users-for-manual', protect, admin, getUsersForManualAttendance);
 router.post('/manual-record', protect, admin, createManualRecord);
 
 // New admin attendance management routes
