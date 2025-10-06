@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { Pool } = require('pg');
+const dns = require('dns');
 require('dotenv').config();
 
 // Existing Mongo connection (kept for current features)
@@ -23,6 +24,8 @@ const getPgPool = () => {
         }
         pgPool = new Pool({
             connectionString,
+            // Force IPv4 to avoid ENETUNREACH when IPv6 is unavailable
+            lookup: (hostname, options, callback) => dns.lookup(hostname, { family: 4 }, callback),
             ssl: connectionString && connectionString.includes('sslmode=require')
                 ? { rejectUnauthorized: false }
                 : { rejectUnauthorized: false }
