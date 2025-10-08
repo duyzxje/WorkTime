@@ -662,6 +662,7 @@ const getDetailedSalaryTable = async (req, res) => {
                     dailyRecords: salaryRecord.dailyRecords.map(record => ({
                         date: record.date,
                         workHours: record.workHours,
+                        hourlyRate: record.hourlyRate,
                         dailySalary: record.dailySalary,
                         checkInTime: record.checkInTime,
                         checkOutTime: record.checkOutTime,
