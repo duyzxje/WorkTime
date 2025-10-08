@@ -49,10 +49,6 @@ const salarySchema = new mongoose.Schema({
     }],
     // Danh sách tiền thưởng
     bonuses: [{
-        _id: {
-            type: mongoose.Schema.Types.ObjectId,
-            default: mongoose.Types.ObjectId
-        },
         amount: {
             type: Number,
             required: true,
@@ -69,10 +65,6 @@ const salarySchema = new mongoose.Schema({
     }],
     // Danh sách tiền trừ
     deductions: [{
-        _id: {
-            type: mongoose.Schema.Types.ObjectId,
-            default: mongoose.Types.ObjectId
-        },
         amount: {
             type: Number,
             required: true,
