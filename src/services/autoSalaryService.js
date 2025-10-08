@@ -47,6 +47,7 @@ const calculateMonthlySalary = async (userId, month, year, hourlyRate = null) =>
             dailyRecords.push({
                 date: record.checkInTime,
                 workHours: Math.round(workHours * 100) / 100,
+                hourlyRate: hourlyRate,
                 dailySalary: Math.round(dailySalary),
                 checkInTime: record.checkInTime,
                 checkOutTime: record.checkOutTime,

@@ -58,6 +58,7 @@ const calculateSalary = async (req, res) => {
             dailyRecords.push({
                 date: record.checkInTime,
                 workHours: Math.round(workHours * 100) / 100, // Round to 2 decimal places
+                hourlyRate: user.hourlyRate,
                 dailySalary: Math.round(dailySalary),
                 checkInTime: record.checkInTime,
                 checkOutTime: record.checkOutTime,
@@ -255,6 +256,7 @@ const exportSalaryToExcel = async (req, res) => {
             { header: 'Giờ vào', key: 'checkInTime', width: 15 },
             { header: 'Giờ ra', key: 'checkOutTime', width: 15 },
             { header: 'Số giờ làm', key: 'workHours', width: 15 },
+            { header: 'Mức lương/giờ', key: 'hourlyRate', width: 18 },
             { header: 'Lương ngày', key: 'dailySalary', width: 15 },
             { header: 'Hợp lệ', key: 'isValid', width: 10 },
             { header: 'Ghi chú', key: 'notes', width: 20 }
@@ -275,16 +277,27 @@ const exportSalaryToExcel = async (req, res) => {
             return Number(value).toLocaleString('vi-VN') + 'đ';
         };
 
+        const formatDateDDMMYYYY = (dateLike) => {
+            if (!dateLike) return '';
+            const d = new Date(dateLike);
+            if (isNaN(d.getTime())) return '';
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            return `${dd}-${mm}-${yyyy}`;
+        };
+
         salaryRecord.dailyRecords.forEach(record => {
             const date = new Date(record.date);
             const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
             dailySheet.addRow({
-                date: date.toISOString().split('T')[0],
+                date: formatDateDDMMYYYY(date),
                 dayOfWeek: dayNames[date.getDay()],
                 checkInTime: formatTimeHHmm(record.checkInTime),
                 checkOutTime: formatTimeHHmm(record.checkOutTime),
                 workHours: record.workHours,
+                hourlyRate: formatCurrencyVND(record.hourlyRate ?? salaryRecord.hourlyRate),
                 dailySalary: formatCurrencyVND(record.dailySalary),
                 isValid: record.isValid ? 'Có' : 'Không',
                 notes: record.notes || ''
@@ -675,19 +688,26 @@ const getDetailedSalaryTable = async (req, res) => {
 const updateDailySalary = async (req, res) => {
     try {
         const { salaryId } = req.params;
-        const { date, dailySalary } = req.body;
+        const { date, dailySalary, hourlyRate } = req.body;
 
-        if (!date || dailySalary === undefined) {
+        if (!date || (dailySalary === undefined && hourlyRate === undefined)) {
             return res.status(400).json({
                 success: false,
-                message: 'Date and daily salary are required'
+                message: 'Date and at least one of daily salary or hourly rate is required'
             });
         }
 
-        if (dailySalary < 0) {
+        if (dailySalary !== undefined && dailySalary < 0) {
             return res.status(400).json({
                 success: false,
                 message: 'Daily salary must be non-negative'
+            });
+        }
+
+        if (hourlyRate !== undefined && hourlyRate < 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Hourly rate must be non-negative'
             });
         }
 
@@ -714,8 +734,26 @@ const updateDailySalary = async (req, res) => {
             });
         }
 
-        // Update the daily record
-        salaryRecord.dailyRecords[dailyRecordIndex].dailySalary = Math.round(dailySalary);
+        // Update the daily record (hourlyRate and/or dailySalary)
+        const record = salaryRecord.dailyRecords[dailyRecordIndex];
+        const original = {
+            hourlyRate: record.hourlyRate || 0,
+            dailySalary: record.dailySalary || 0
+        };
+
+        if (hourlyRate !== undefined) {
+            record.hourlyRate = Math.round(hourlyRate);
+            const workHours = record.workHours || 0;
+            record.dailySalary = Math.round((workHours || 0) * record.hourlyRate);
+        }
+
+        if (dailySalary !== undefined && (hourlyRate === undefined)) {
+            record.dailySalary = Math.round(dailySalary);
+            const workHours = record.workHours || 0;
+            if (workHours > 0) {
+                record.hourlyRate = Math.round(record.dailySalary / workHours);
+            }
+        }
 
         // Recalculate total salary from all daily records
         let newTotalSalary = 0;
@@ -739,6 +777,14 @@ const updateDailySalary = async (req, res) => {
             data: {
                 salary: salaryRecord,
                 updatedDailyRecord: salaryRecord.dailyRecords[dailyRecordIndex],
+                changeLog: {
+                    date: targetDate,
+                    before: original,
+                    after: {
+                        hourlyRate: salaryRecord.dailyRecords[dailyRecordIndex].hourlyRate,
+                        dailySalary: salaryRecord.dailyRecords[dailyRecordIndex].dailySalary
+                    }
+                },
                 summary: {
                     totalSalary: salaryRecord.totalSalary,
                     totalBonus,

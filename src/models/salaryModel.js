@@ -38,6 +38,11 @@ const salarySchema = new mongoose.Schema({
             type: Number,
             default: 0
         },
+        hourlyRate: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
         dailySalary: {
             type: Number,
             default: 0
