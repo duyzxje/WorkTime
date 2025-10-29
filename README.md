@@ -425,6 +425,114 @@ Gợi ý cấu hình khác:
 
 - `GET /api/auth/verify` - Verify token and get user data
 
+### Customers
+
+- `GET /api/customers` - List customers with pagination and search
+  - Query params (optional):
+    - `page`: number (default: 1)
+    - `limit`: number (default: 20)
+    - `search`: string - matches `username`, `name`, `phone`, `address`
+    - `marked`: `true|1` to return only customers with `marked_at` not null
+  - Response:
+    ```json
+    {
+      "success": true,
+      "data": [
+        {
+          "id": 123,
+          "username": "user123",
+          "name": "Khách A",
+          "phone": "0909...",
+          "address": "Hà Nội",
+          "notes": "ghi chú",
+          "marked_at": "2025-10-01T00:00:00.000Z",
+          "created_at": "2025-09-30T10:00:00.000Z",
+          "updated_at": "2025-10-01T00:00:00.000Z"
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "limit": 20
+    }
+    ```
+
+- `GET /api/customers/:id` - Get customer by id
+  - Response:
+    ```json
+    { "success": true, "data": { "id": 123, "username": "user123", "name": "Khách A", "phone": "", "address": "", "notes": "", "marked_at": null, "created_at": "...", "updated_at": "..." } }
+    ```
+
+- `GET /api/customers/by-username/:username` - Get by username
+  - Response when found:
+    ```json
+    { "success": true, "data": { "id": 123, "username": "user123", "name": "Khách A" } }
+    ```
+  - Response when not found:
+    ```json
+    { "success": false, "data": null }
+    ```
+
+- `POST /api/customers` - Create or update by username (upsert)
+  - Body:
+    ```json
+    { "username": "user123", "name": "Khách A", "phone": "0909...", "address": "Hà Nội", "notes": "ghi chú" }
+    ```
+  - Responses:
+    - Created (username chưa tồn tại):
+      ```json
+      { "success": true, "data": { /* customer */ }, "upserted": false, "action": "created" }
+      ```
+    - Updated (username đã tồn tại):
+      ```json
+      { "success": true, "data": { /* customer */ }, "upserted": true, "action": "updated" }
+      ```
+
+- `PUT /api/customers/:id` - Update customer
+  - Body: bất kỳ trường trong số `name, phone, address, notes, username`
+  - Response:
+    ```json
+    { "success": true, "data": { /* customer */ } }
+    ```
+
+- `PATCH /api/customers/:id/mark` - Mark/Unmark customer
+  - Body:
+    ```json
+    { "marked": true }
+    ```
+  - Response:
+    ```json
+    { "success": true, "id": 123, "marked_at": "2025-10-01T00:00:00.000Z" }
+    ```
+
+- `DELETE /api/customers/:id` - Delete customer
+  - Response:
+    ```json
+    { "success": true }
+    ```
+
+#### Customers - cURL examples
+```
+# List
+curl 'http://localhost:5000/api/customers?page=1&limit=20&search=anh&marked=true'
+
+# Create / upsert by username
+curl -X POST 'http://localhost:5000/api/customers' \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"user123","name":"Khách A","phone":"0909...","address":"HN"}'
+
+# Update
+curl -X PUT 'http://localhost:5000/api/customers/123' \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Khách A+"}'
+
+# Mark
+curl -X PATCH 'http://localhost:5000/api/customers/123/mark' \
+  -H 'Content-Type: application/json' -d '{"marked": true}'
+
+# Delete
+curl -X DELETE 'http://localhost:5000/api/customers/123'
+```
+
 ## Cách hoạt động
 
 ### Dashboard Statistics
