@@ -137,6 +137,91 @@ async function findOrderFromCommentsLookup(username, liveDate) {
     return (data && data[0]) || null;
 }
 
+// Create new order with items
+async function createOrderWithItems({ customerUsername, liveDate, items, note = '' }) {
+    const now = new Date().toISOString();
+
+    // Calculate total amount
+    const totalAmount = items.reduce((sum, item) => sum + (item.line_total || 0), 0);
+
+    // Insert order
+    const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+            customer_username: customerUsername,
+            live_date: liveDate,
+            total_amount: totalAmount,
+            note,
+            status: 'chua_rep',
+            created_at: now,
+            updated_at: now
+        })
+        .select('id, customer_username, total_amount, live_date')
+        .single();
+
+    if (orderError) throw orderError;
+
+    // Insert order items
+    const orderItems = items.map(item => ({
+        order_id: order.id,
+        content: item.content,
+        unit_price: item.unit_price,
+        quantity: item.quantity,
+        line_total: item.line_total,
+        created_at: now
+    }));
+
+    const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+    if (itemsError) throw itemsError;
+
+    return { order, itemsCount: items.length };
+}
+
+// Add items to existing order
+async function addItemsToOrder(orderId, items) {
+    const now = new Date().toISOString();
+
+    // Get current order
+    const { data: order, error: getOrderError } = await supabase
+        .from('orders')
+        .select('id, total_amount')
+        .eq('id', orderId)
+        .single();
+
+    if (getOrderError) throw getOrderError;
+
+    // Insert new items
+    const orderItems = items.map(item => ({
+        order_id: orderId,
+        content: item.content,
+        unit_price: item.unit_price,
+        quantity: item.quantity,
+        line_total: item.line_total,
+        created_at: now
+    }));
+
+    const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+    if (itemsError) throw itemsError;
+
+    // Update total amount
+    const newTotal = order.total_amount + items.reduce((sum, item) => sum + item.line_total, 0);
+
+    const { error: updateError } = await supabase
+        .from('orders')
+        .update({ total_amount: newTotal, updated_at: now })
+        .eq('id', orderId);
+
+    if (updateError) throw updateError;
+
+    return { oldTotal: order.total_amount, newTotal, itemsCount: items.length };
+}
+
 module.exports = {
     VALID_STATUSES,
     STATUS_ORDER,
@@ -147,7 +232,9 @@ module.exports = {
     updateOrderStatus,
     deleteOrder,
     bulkDeleteOrders,
-    findOrderFromCommentsLookup
+    findOrderFromCommentsLookup,
+    createOrderWithItems,
+    addItemsToOrder
 };
 
 

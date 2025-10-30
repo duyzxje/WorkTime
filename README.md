@@ -211,6 +211,88 @@ Backend service for employee attendance tracking with GPS validation.
 - `GET /api/reports/monthly/:userId` - Get monthly attendance report
   - Optional query params: `year`
 
+### Orders
+
+- `GET /api/orders` - List orders with pagination and search
+  - Required query params: `start`, `end` (ISO datetime)
+  - Optional query params: `page`, `limit`, `search`, `status`
+  - Returns: `{ data: [...], statusCounts: [...], page, limit, total }`
+
+- `GET /api/orders/:orderId` - Get order detail
+  - Returns: `{ order: {...}, items: [...] }`
+
+- `GET /api/orders/:orderId/items` - Get order items
+  - Returns: `{ data: [...] }`
+
+- `PATCH /api/orders/:orderId/status` - Update order status
+  - Body: `{ status: "chua_rep" | "giu_don" | "di_don" | "gap" | "hoan_thanh" | "warning" }`
+  - Returns: `{ success: true, orderId, status }`
+
+- `POST /api/orders/from-comments` - Lookup order by username and live_date
+  - Body: `{ username, liveDate }`
+  - Returns: `{ success: true, order_id, total, items }`
+
+- `POST /api/orders/create-from-printed` - **Create/update orders from printed_history**
+  - Body: `{ startTime: "2023-10-21T09:00:00.000Z", endTime: "2023-10-25T23:00:00.000Z" }`
+  - Success Response (200):
+    ```json
+    {
+      "success": true,
+      "data": {
+        "created": [
+          {
+            "orderId": 1436,
+            "username": "user123",
+            "itemsAdded": 5,
+            "total": 500000,
+            "liveDate": "2023-10-21"
+          }
+        ],
+        "updated": [
+          {
+            "orderId": 1435,
+            "username": "kiwiditinana",
+            "itemsAdded": 3,
+            "oldTotal": 200000,
+            "newTotal": 350000
+          }
+        ],
+        "summary": {
+          "totalOrders": 2,
+          "totalItems": 8,
+          "totalAmount": 850000
+        }
+      }
+    }
+    ```
+  - Error Response (400) - Split printed conflict:
+    ```json
+    {
+      "success": false,
+      "message": "Khoảng thời gian chọn sẽ chia cắt printed của đơn hàng #1435 (username: kiwiditinana). Vui lòng chọn khoảng thời gian phù hợp.",
+      "conflictOrder": {
+        "orderId": 1435,
+        "username": "kiwiditinana",
+        "usernameConflict": true
+      }
+    }
+    ```
+  - **Logic**:
+    - Parse giá từ `comment_text` trong `printed_history` (ví dụ: "200" → 200000đ, "t150" → 150000đ)
+    - Nhóm printed theo `username`
+    - Nếu 1 đơn hàng có TẤT CẢ printed nằm trong khoảng thời gian → cập nhật (thêm printed mới vào)
+    - Nếu không → tạo đơn hàng mới
+    - `live_date` = ngày của printed đầu tiên (YYYY-MM-DD, không có giờ)
+    - `status` mặc định = "chua_rep"
+    - Ngăn chặn chia cắt printed: nếu khoảng thời gian chỉ chứa 1 nửa printed → trả lỗi 400
+
+- `DELETE /api/orders/:orderId` - Delete order
+  - Returns: `{ success: true }`
+
+- `POST /api/orders/bulk-delete` - Bulk delete orders
+  - Body: `{ ids: [orderId1, orderId2, ...] }`
+  - Returns: `[{ orderId, success }, ...]`
+
 ### Shifts
 
 - `GET /api/shifts` - Get all shift registrations for the week
