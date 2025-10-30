@@ -114,9 +114,9 @@ async function checkOrderSplit(orderId, startTime, endTime) {
 }
 
 /**
- * Get all items of an order
+ * Get all items of an order (internal function)
  */
-async function getOrderItems(orderId) {
+async function getOrderItemsInternal(orderId) {
     const { data, error } = await supabase
         .from('order_items')
         .select('*')
@@ -131,7 +131,7 @@ async function getOrderItems(orderId) {
  * Check if ALL items of an order are within time range
  */
 async function checkOrderFullyInRange(orderId, startTime, endTime) {
-    const items = await getOrderItems(orderId);
+    const items = await getOrderItemsInternal(orderId);
 
     if (items.length === 0) return false;
 
@@ -159,6 +159,5 @@ module.exports = {
     getAvailablePrintedHistory,
     getOrdersWithCommentIds,
     checkOrderSplit,
-    getOrderItems,
     checkOrderFullyInRange
 };

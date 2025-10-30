@@ -17,7 +17,6 @@ const {
     getAvailablePrintedHistory,
     getOrdersWithCommentIds,
     checkOrderSplit,
-    getOrderItems,
     checkOrderFullyInRange
 } = require('../models/printedHistoryModel');
 
