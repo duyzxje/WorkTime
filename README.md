@@ -286,6 +286,45 @@ Backend service for employee attendance tracking with GPS validation.
     - `status` mặc định = "chua_rep"
     - Ngăn chặn chia cắt printed: nếu khoảng thời gian chỉ chứa 1 nửa printed → trả lỗi 400
 
+- `POST /api/orders/preview-from-printed` - **Preview đơn hàng có thể tạo từ printed_history (chỉ trả về dữ liệu, không ghi DB)**
+  - Body: `{ startTime: "2023-10-21T09:00:00.000Z", endTime: "2023-10-25T23:00:00.000Z" }`
+  - Success response:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "orders": [
+          {
+            "username": "user123",
+            "liveDate": "2023-10-21",
+            "items": [
+              { "content": "xanh 100", "unit_price": 100000, "quantity": 1, "line_total": 100000 },
+              { "content": "t150",     "unit_price": 150000, "quantity": 1, "line_total": 150000 }
+            ],
+            "total": 250000
+          }
+        ],
+        "summary": {
+          "totalOrders": 1,
+          "totalItems": 2,
+          "totalAmount": 250000
+        }
+      }
+    }
+    ```
+  - Error response (400):
+    ```json
+    {
+      "success": false,
+      "message": "Khoảng thời gian chọn sẽ chia cắt printed của đơn hàng #1435 (username: kiwiditinana). Vui lòng chọn khoảng thời gian phù hợp.",
+      "conflictOrder": { "orderId": 1435, "username": "kiwiditinana", "usernameConflict": true }
+    }
+    ```
+  - Logic:
+    - Nhóm printed chưa gán đơn theo username
+    - Tính toán preview đơn và tổng doanh thu, số đơn, số sản phẩm theo khoảng chọn
+    - Kiểm tra split printed
+
 - `DELETE /api/orders/:orderId` - Delete order
   - Returns: `{ success: true }`
 

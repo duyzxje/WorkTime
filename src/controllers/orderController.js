@@ -284,6 +284,94 @@ const createFromPrinted = async (req, res) => {
     }
 };
 
+// POST /orders/preview-from-printed
+const previewFromPrinted = async (req, res) => {
+    try {
+        const { startTime, endTime } = req.body || {};
+
+        if (!startTime || !endTime) {
+            return res.status(400).json({
+                success: false,
+                message: 'startTime and endTime are required (ISO datetime format)'
+            });
+        }
+
+        // Step 1: Get available printed history in time range
+        const availablePrinted = await getAvailablePrintedHistory(startTime, endTime);
+        if (availablePrinted.length === 0) {
+            return res.json({
+                success: true,
+                data: {
+                    orders: [],
+                    summary: { totalOrders: 0, totalItems: 0, totalAmount: 0 }
+                }
+            });
+        }
+        // Step 2: Check for potential split orders
+        const commentIds = availablePrinted.map(p => p.comment_id);
+        const relatedOrders = await getOrdersWithCommentIds(commentIds);
+        for (const order of relatedOrders) {
+            const willSplit = await checkOrderSplit(order.id, startTime, endTime);
+            if (willSplit) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Khoảng thời gian chọn sẽ chia cắt printed của đơn hàng #${order.id} (username: ${order.customer_username}). Vui lòng chọn khoảng thời gian phù hợp.`,
+                    conflictOrder: {
+                        orderId: order.id,
+                        username: order.customer_username,
+                        usernameConflict: true
+                    }
+                });
+            }
+        }
+        // Step 3: Group by username and prepare preview orders
+        const printedByUsername = {};
+        for (const printed of availablePrinted) {
+            if (!printedByUsername[printed.username]) {
+                printedByUsername[printed.username] = [];
+            }
+            printedByUsername[printed.username].push(printed);
+        }
+        let totalAmount = 0;
+        let totalItemsCount = 0;
+        const orders = [];
+        for (const [username, printedList] of Object.entries(printedByUsername)) {
+            const items = printedList.map(p => ({
+                content: p.comment_text,
+                unit_price: parsePrice(p.comment_text),
+                quantity: 1,
+                line_total: parsePrice(p.comment_text)
+            }));
+            const orderTotal = items.reduce((sum, item) => sum + item.line_total, 0);
+            totalItemsCount += items.length;
+            totalAmount += orderTotal;
+            // Get first printed_at for live_date
+            const firstPrinted = printedList[0];
+            const liveDate = firstPrinted.printed_at.split('T')[0];
+            orders.push({
+                username,
+                liveDate,
+                items,
+                total: orderTotal
+            });
+        }
+        return res.json({
+            success: true,
+            data: {
+                orders,
+                summary: {
+                    totalOrders: orders.length,
+                    totalItems: totalItemsCount,
+                    totalAmount
+                }
+            }
+        });
+    } catch (error) {
+        console.error('previewFromPrinted error:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 module.exports = {
     getOrders,
     getOrderDetail,
@@ -292,7 +380,8 @@ module.exports = {
     createOrdersFromComments,
     removeOrder,
     bulkDelete,
-    createFromPrinted
+    createFromPrinted,
+    previewFromPrinted
 };
 
 

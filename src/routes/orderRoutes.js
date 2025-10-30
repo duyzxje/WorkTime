@@ -9,7 +9,8 @@ const {
     createOrdersFromComments,
     removeOrder,
     bulkDelete,
-    createFromPrinted
+    createFromPrinted,
+    previewFromPrinted
 } = require('../controllers/orderController');
 
 // No auth limits as requested
@@ -20,6 +21,7 @@ router.get('/:orderId/items', getOrderItems);
 router.patch('/:orderId/status', patchOrderStatus);
 router.post('/from-comments', createOrdersFromComments);
 router.post('/create-from-printed', createFromPrinted);
+router.post('/preview-from-printed', previewFromPrinted);
 router.delete('/:orderId', removeOrder);
 router.post('/bulk-delete', bulkDelete);
 
