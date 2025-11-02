@@ -9,7 +9,8 @@ const {
     bulkDeleteOrders,
     findOrderFromCommentsLookup,
     createOrderWithItems,
-    addItemsToOrder
+    addItemsToOrder,
+    getTotalRevenue
 } = require('../models/orderModel');
 
 const {
@@ -44,9 +45,10 @@ const getOrders = async (req, res) => {
             .map(s => s.trim())
             .filter(Boolean);
 
-        const [listResult, counts] = await Promise.all([
+        const [listResult, counts, totalRevenue] = await Promise.all([
             listOrders({ start, end, search, statusList, page, limit }),
-            getStatusCounts({ start, end, search })
+            getStatusCounts({ start, end, search }),
+            getTotalRevenue({ start, end, search, statusList })
         ]);
 
         return res.json({
@@ -54,7 +56,8 @@ const getOrders = async (req, res) => {
             statusCounts: counts,
             page: Number(page),
             limit: Number(limit),
-            total: listResult.total
+            total: listResult.total,
+            totalRevenue
         });
     } catch (error) {
         console.error('getOrders error:', error);
@@ -372,6 +375,57 @@ const previewFromPrinted = async (req, res) => {
     }
 };
 
+// POST /orders - Tạo đơn hàng mới thủ công
+const createOrder = async (req, res) => {
+    try {
+        const { username, liveDate, items, note = '' } = req.body || {};
+
+        if (!username || !liveDate || !items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'username, liveDate, and items (non-empty array) are required'
+            });
+        }
+
+        // Validate items structure
+        for (const item of items) {
+            if (!item.content || item.unit_price === undefined || item.quantity === undefined) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Each item must have content, unit_price, and quantity'
+                });
+            }
+        }
+
+        // Calculate line_total for each item if not provided
+        const processedItems = items.map(item => ({
+            content: item.content,
+            unit_price: Number(item.unit_price),
+            quantity: Number(item.quantity),
+            line_total: item.line_total !== undefined ? Number(item.line_total) : Number(item.unit_price) * Number(item.quantity)
+        }));
+
+        const result = await createOrderWithItems({
+            customerUsername: username,
+            liveDate,
+            items: processedItems,
+            note
+        });
+
+        return res.status(201).json({
+            success: true,
+            data: {
+                order: result.order,
+                itemsCount: result.itemsCount
+            }
+        });
+
+    } catch (error) {
+        console.error('createOrder error:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 module.exports = {
     getOrders,
     getOrderDetail,
@@ -381,7 +435,8 @@ module.exports = {
     removeOrder,
     bulkDelete,
     createFromPrinted,
-    previewFromPrinted
+    previewFromPrinted,
+    createOrder
 };
 
 

@@ -216,7 +216,74 @@ Backend service for employee attendance tracking with GPS validation.
 - `GET /api/orders` - List orders with pagination and search
   - Required query params: `start`, `end` (ISO datetime)
   - Optional query params: `page`, `limit`, `search`, `status`
-  - Returns: `{ data: [...], statusCounts: [...], page, limit, total }`
+  - Returns: `{ data: [...], statusCounts: [...], page, limit, total, totalRevenue }`
+  - Example response:
+    ```json
+    {
+      "data": [
+        {
+          "id": 1436,
+          "customer_username": "user123",
+          "live_date": "2023-10-21",
+          "total_amount": 350000,
+          "status": "chua_rep",
+          "created_at": "2023-10-21T10:30:00.000Z"
+        }
+      ],
+      "statusCounts": [
+        { "status": "gap", "count": 5 },
+        { "status": "di_don", "count": 3 },
+        { "status": "chua_rep", "count": 10 },
+        { "status": "giu_don", "count": 2 },
+        { "status": "warning", "count": 1 },
+        { "status": "hoan_thanh", "count": 25 }
+      ],
+      "page": 1,
+      "limit": 20,
+      "total": 46,
+      "totalRevenue": 12000000
+    }
+    ```
+  - `totalRevenue`: Tổng doanh thu của tất cả đơn hàng trong khoảng thời gian (tính theo các bộ lọc search/status)
+
+- `POST /api/orders` - **Create new order manually**
+  - Body: 
+    ```json
+    {
+      "username": "user123",
+      "liveDate": "2023-10-21",
+      "items": [
+        {
+          "content": "Sản phẩm X",
+          "unit_price": 100000,
+          "quantity": 2
+        },
+        {
+          "content": "Sản phẩm Y",
+          "unit_price": 150000,
+          "quantity": 1,
+          "line_total": 150000
+        }
+      ],
+      "note": "Ghi chú đơn hàng (optional)"
+    }
+    ```
+  - Returns (201):
+    ```json
+    {
+      "success": true,
+      "data": {
+        "order": {
+          "id": 1436,
+          "customer_username": "user123",
+          "total_amount": 350000,
+          "live_date": "2023-10-21"
+        },
+        "itemsCount": 2
+      }
+    }
+    ```
+  - Note: `line_total` is optional, will be auto-calculated as `unit_price * quantity` if not provided
 
 - `GET /api/orders/:orderId` - Get order detail
   - Returns: `{ order: {...}, items: [...] }`

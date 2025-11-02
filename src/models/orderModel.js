@@ -222,6 +222,35 @@ async function addItemsToOrder(orderId, items) {
     return { oldTotal: order.total_amount, newTotal, itemsCount: items.length };
 }
 
+// Get total revenue for a time range
+async function getTotalRevenue({ start, end, search, statusList }) {
+    let base = supabase
+        .from('orders')
+        .select('total_amount')
+        .gte('created_at', start)
+        .lte('created_at', end);
+
+    if (search && String(search).trim() !== '') {
+        const q = `%${search}%`;
+        base = base.or(
+            `customer_username.ilike.${q},id.in.(select order_id from order_items where product_name.ilike.${q} or content.ilike.${q})`
+        );
+    }
+
+    if (statusList && statusList.length > 0) {
+        const valid = statusList.filter(s => VALID_STATUSES.includes(s));
+        if (valid.length > 0) {
+            base = base.in('status', valid);
+        }
+    }
+
+    const { data, error } = await base;
+    if (error) throw error;
+
+    const totalRevenue = (data || []).reduce((sum, order) => sum + (order.total_amount || 0), 0);
+    return totalRevenue;
+}
+
 module.exports = {
     VALID_STATUSES,
     STATUS_ORDER,
@@ -234,7 +263,8 @@ module.exports = {
     bulkDeleteOrders,
     findOrderFromCommentsLookup,
     createOrderWithItems,
-    addItemsToOrder
+    addItemsToOrder,
+    getTotalRevenue
 };
 
 
