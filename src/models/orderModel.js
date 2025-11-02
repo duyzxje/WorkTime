@@ -156,7 +156,7 @@ async function createOrderWithItems({ customerUsername, liveDate, items, note = 
             created_at: now,
             updated_at: now
         })
-        .select('id, customer_username, total_amount, live_date')
+        .select('id, customer_username, total_amount, live_date, status, note, created_at, updated_at')
         .single();
 
     if (orderError) throw orderError;
@@ -171,13 +171,14 @@ async function createOrderWithItems({ customerUsername, liveDate, items, note = 
         created_at: now
     }));
 
-    const { error: itemsError } = await supabase
+    const { data: insertedItems, error: itemsError } = await supabase
         .from('order_items')
-        .insert(orderItems);
+        .insert(orderItems)
+        .select();
 
     if (itemsError) throw itemsError;
 
-    return { order, itemsCount: items.length };
+    return { order, itemsCount: items.length, items: insertedItems || [] };
 }
 
 // Add items to existing order

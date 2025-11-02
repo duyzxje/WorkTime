@@ -416,7 +416,8 @@ const createOrder = async (req, res) => {
             success: true,
             data: {
                 order: result.order,
-                itemsCount: result.itemsCount
+                itemsCount: result.itemsCount,
+                items: result.items
             }
         });
 

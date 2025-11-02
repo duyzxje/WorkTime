@@ -277,9 +277,33 @@ Backend service for employee attendance tracking with GPS validation.
           "id": 1436,
           "customer_username": "user123",
           "total_amount": 350000,
-          "live_date": "2023-10-21"
+          "live_date": "2023-10-21",
+          "status": "chua_rep",
+          "note": "Ghi chú đơn hàng",
+          "created_at": "2023-10-21T10:30:00.000Z",
+          "updated_at": "2023-10-21T10:30:00.000Z"
         },
-        "itemsCount": 2
+        "itemsCount": 2,
+        "items": [
+          {
+            "id": 1,
+            "order_id": 1436,
+            "content": "Sản phẩm X",
+            "unit_price": 100000,
+            "quantity": 2,
+            "line_total": 200000,
+            "created_at": "2023-10-21T10:30:00.000Z"
+          },
+          {
+            "id": 2,
+            "order_id": 1436,
+            "content": "Sản phẩm Y",
+            "unit_price": 150000,
+            "quantity": 1,
+            "line_total": 150000,
+            "created_at": "2023-10-21T10:30:00.000Z"
+          }
+        ]
       }
     }
     ```
