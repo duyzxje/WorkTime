@@ -372,21 +372,150 @@ Backend service for employee attendance tracking with GPS validation.
       }
     }
     ```
-  - **Logic**:
-    - Lọc `print_type`: Chỉ lấy `'comment'` hoặc `NULL`, bỏ qua `'backup'` và `'backup_notification'`
-    - Parse giá từ `comment_text` trong `printed_history` (ví dụ: "200" → 200000đ, "t150" → 150000đ)
-    - Nhóm printed theo `username`
-    - Tìm đơn hàng tồn tại:
-      - Ưu tiên 1: Tìm theo `live_date` trong khoảng [startDate, endDate] (CommiLive style)
-      - Ưu tiên 2: Tìm theo `comment_id` và kiểm tra tất cả items có trong range
-    - Nếu đơn hàng tồn tại: 
-      - So sánh items mới với items hiện tại (trim, exact match, case-insensitive)
-      - Chỉ append items chưa có (tránh trùng lặp)
-      - Trả về `existing: true`, `appended: số items mới`
-    - Nếu không có đơn hàng tồn tại → tạo đơn hàng mới
-    - `live_date` = ngày của printed đầu tiên (YYYY-MM-DD, không có giờ)
-    - `status` mặc định = "chua_rep"
-    - Ngăn chặn chia cắt printed: nếu khoảng thời gian chỉ chứa 1 nửa printed → trả lỗi 400
+  - **Hướng dẫn sử dụng cho FE:**
+    
+    **API:** `POST /api/orders/create-from-printed`
+    
+    **Request:**
+    ```javascript
+    POST /api/orders/create-from-printed
+    Content-Type: application/json
+    
+    {
+      "startTime": "2023-10-21T09:00:00.000Z",
+      "endTime": "2023-10-21T23:59:59.000Z"
+    }
+    ```
+    
+    **Response khi thành công:**
+    ```json
+    {
+      "success": true,
+      "data": {
+        "created": [
+          {
+            "orderId": 1436,
+            "username": "user123",
+            "itemsAdded": 5,
+            "total": 500000,
+            "liveDate": "2023-10-21",
+            "existing": false  // Đơn mới được tạo
+          }
+        ],
+        "updated": [
+          {
+            "orderId": 1435,
+            "username": "customer456",
+            "itemsAdded": 2,     // Số items mới được thêm
+            "appended": 2,      // = itemsAdded (số items thực sự được append)
+            "skipped": 1,       // Số items bị bỏ qua vì trùng lặp
+            "oldTotal": 200000,
+            "newTotal": 350000,
+            "existing": true    // Đơn đã tồn tại, được update
+          }
+        ],
+        "summary": {
+          "totalOrders": 2,
+          "totalItems": 7,
+          "totalAmount": 850000
+        }
+      }
+    }
+    ```
+    
+    **Response khi có lỗi (chia cắt đơn hàng):**
+    ```json
+    {
+      "success": false,
+      "message": "Khoảng thời gian chọn sẽ chia cắt printed của đơn hàng #1435 (username: customer456). Vui lòng chọn khoảng thời gian phù hợp.",
+      "conflictOrder": {
+        "orderId": 1435,
+        "username": "customer456",
+        "usernameConflict": true
+      }
+    }
+    ```
+    
+    **Logic kiểm tra tránh trùng lặp (tự động):**
+    
+    **1. Tìm đơn hàng tồn tại:**
+    - Hệ thống tự động tìm đơn hàng đã có của username trong khoảng thời gian
+    - Kiểm tra theo `live_date` (ngày của đơn hàng) nằm trong khoảng [startDate, endDate]
+    
+    **2. Nếu tìm thấy đơn hàng tồn tại (`existing: true`):**
+    - So sánh comments mới với items đã có trong đơn
+    - Chỉ thêm những comment chưa có (tự động bỏ qua comment trùng)
+    - Check trong `updated[]` array:
+      - `appended`: Số items mới được thêm vào đơn
+      - `skipped`: Số items bị bỏ qua vì trùng lặp
+      - `oldTotal` / `newTotal`: Tổng tiền trước/sau khi update
+    
+    **3. Nếu không tìm thấy đơn hàng (`existing: false`):**
+    - Tạo đơn hàng mới
+    - Check trong `created[]` array
+    
+    **4. Xử lý Response cho FE:**
+    ```javascript
+    // Ví dụ code FE
+    const response = await fetch('/api/orders/create-from-printed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        startTime: "2023-10-21T09:00:00.000Z",
+        endTime: "2023-10-21T23:59:59.000Z"
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      // Xử lý đơn mới
+      result.data.created.forEach(order => {
+        console.log(`Tạo đơn mới #${order.orderId} cho ${order.username}`);
+      });
+      
+      // Xử lý đơn được update
+      result.data.updated.forEach(order => {
+        if (order.appended > 0) {
+          console.log(`Cập nhật đơn #${order.orderId}: +${order.appended} items mới`);
+        }
+        if (order.skipped > 0) {
+          console.log(`Bỏ qua ${order.skipped} items trùng lặp`);
+        }
+      });
+      
+      // Hiển thị summary
+      console.log(`Tổng: ${result.data.summary.totalOrders} đơn, ${result.data.summary.totalItems} items`);
+    } else {
+      // Xử lý lỗi (thường là chia cắt đơn hàng)
+      alert(result.message);
+    }
+    ```
+    
+    **5. Lưu ý quan trọng:**
+    - ✅ Hệ thống tự động xử lý trùng lặp, FE không cần check trước
+    - ✅ Comment được coi là trùng nếu `content` giống nhau (sau khi trim và bỏ qua hoa/thường)
+    - ✅ Không lấy comments có `print_type = 'backup'` (chỉ lấy `'comment'` hoặc `NULL`)
+    - ⚠️ Nếu khoảng thời gian chia cắt đơn hàng hiện có → trả lỗi 400 (cần chọn khoảng khác)
+    
+    **Ví dụ xử lý trùng lặp:**
+    ```
+    Đơn hàng #123 đã có items:
+    - "Em muốn 1 cái 100k"
+    - "Cho em thêm 2 cái"
+    
+    Comments mới trong khoảng thời gian:
+    - "Em muốn 1 cái 100k"     ← TRÙNG → bỏ qua (skipped +1)
+    - "Cho em thêm 2 cái"       ← TRÙNG → bỏ qua (skipped +1)
+    - "Cho em thêm 3 cái nữa"   ← MỚI → thêm vào (appended +1)
+    
+    Response:
+    {
+      "orderId": 123,
+      "appended": 1,
+      "skipped": 2
+    }
+    ```
 
 - `POST /api/orders/preview-from-printed` - **Preview đơn hàng có thể tạo từ printed_history (chỉ trả về dữ liệu, không ghi DB)**
   - Body: `{ startTime: "2023-10-21T09:00:00.000Z", endTime: "2023-10-25T23:00:00.000Z" }`
