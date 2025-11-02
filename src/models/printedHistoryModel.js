@@ -24,14 +24,17 @@ function parsePrice(commentText) {
 
 /**
  * Get printed_history records within time range that are not yet in any order
+ * Filters out print_type = 'backup' or 'backup_notification' (only takes 'comment' or NULL)
  */
 async function getAvailablePrintedHistory(startTime, endTime) {
     // Get all printed_history in range
+    // Only get print_type = 'comment' or NULL (exclude 'backup' and 'backup_notification')
     const { data: printedData, error: printedError } = await supabase
         .from('printed_history')
         .select('*')
         .gte('printed_at', startTime)
         .lte('printed_at', endTime)
+        .or('print_type.is.null,print_type.eq.comment')
         .order('printed_at', { ascending: true });
 
     if (printedError) throw printedError;

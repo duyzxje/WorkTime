@@ -137,6 +137,27 @@ async function findOrderFromCommentsLookup(username, liveDate) {
     return (data && data[0]) || null;
 }
 
+/**
+ * Find existing order by username and live_date range (CommiLive style)
+ * @param {string} username - Customer username
+ * @param {string} startDate - Start date (YYYY-MM-DD)
+ * @param {string} endDate - End date (YYYY-MM-DD)
+ * @returns {Object|null} - Order object or null
+ */
+async function findOrderByLiveDateRange(username, startDate, endDate) {
+    const { data, error } = await supabase
+        .from('orders')
+        .select('id, total_amount, created_at, live_date')
+        .eq('customer_username', username)
+        .gte('live_date', startDate)
+        .lte('live_date', endDate)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    if (error) throw error;
+    return (data && data[0]) || null;
+}
+
 // Create new order with items
 async function createOrderWithItems({ customerUsername, liveDate, items, note = '' }) {
     const now = new Date().toISOString();
@@ -182,20 +203,40 @@ async function createOrderWithItems({ customerUsername, liveDate, items, note = 
 }
 
 // Add items to existing order
+// Filters out duplicate items by comparing content (trim, exact match)
 async function addItemsToOrder(orderId, items) {
     const now = new Date().toISOString();
 
-    // Get current order
-    const { data: order, error: getOrderError } = await supabase
-        .from('orders')
-        .select('id, total_amount')
-        .eq('id', orderId)
-        .single();
+    // Get current order and existing items
+    const [orderResult, existingItemsResult] = await Promise.all([
+        supabase.from('orders').select('id, total_amount').eq('id', orderId).single(),
+        getItemsByOrderId(orderId)
+    ]);
 
-    if (getOrderError) throw getOrderError;
+    if (orderResult.error) throw orderResult.error;
+    const order = orderResult.data;
 
-    // Insert new items
-    const orderItems = items.map(item => ({
+    // Filter out duplicate items by comparing content (trim, exact match)
+    const existingContents = new Set(
+        (existingItemsResult || []).map(item => String(item.content || '').trim().toLowerCase())
+    );
+
+    const newItems = items.filter(item => {
+        const contentTrimmed = String(item.content || '').trim().toLowerCase();
+        return !existingContents.has(contentTrimmed);
+    });
+
+    if (newItems.length === 0) {
+        return {
+            oldTotal: order.total_amount,
+            newTotal: order.total_amount,
+            itemsCount: 0,
+            skipped: items.length
+        };
+    }
+
+    // Insert only new items
+    const orderItems = newItems.map(item => ({
         order_id: orderId,
         content: item.content,
         unit_price: item.unit_price,
@@ -211,7 +252,8 @@ async function addItemsToOrder(orderId, items) {
     if (itemsError) throw itemsError;
 
     // Update total amount
-    const newTotal = order.total_amount + items.reduce((sum, item) => sum + item.line_total, 0);
+    const addedTotal = newItems.reduce((sum, item) => sum + item.line_total, 0);
+    const newTotal = order.total_amount + addedTotal;
 
     const { error: updateError } = await supabase
         .from('orders')
@@ -220,7 +262,12 @@ async function addItemsToOrder(orderId, items) {
 
     if (updateError) throw updateError;
 
-    return { oldTotal: order.total_amount, newTotal, itemsCount: items.length };
+    return {
+        oldTotal: order.total_amount,
+        newTotal,
+        itemsCount: newItems.length,
+        skipped: items.length - newItems.length
+    };
 }
 
 // Get total revenue for a time range
@@ -263,6 +310,7 @@ module.exports = {
     deleteOrder,
     bulkDeleteOrders,
     findOrderFromCommentsLookup,
+    findOrderByLiveDateRange,
     createOrderWithItems,
     addItemsToOrder,
     getTotalRevenue

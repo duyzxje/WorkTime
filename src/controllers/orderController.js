@@ -8,6 +8,7 @@ const {
     deleteOrder,
     bulkDeleteOrders,
     findOrderFromCommentsLookup,
+    findOrderByLiveDateRange,
     createOrderWithItems,
     addItemsToOrder,
     getTotalRevenue
@@ -226,29 +227,44 @@ const createFromPrinted = async (req, res) => {
             const firstPrinted = printedList[0];
             const liveDate = firstPrinted.printed_at.split('T')[0]; // Get date only
 
-            // Check if there's an order that should be updated
-            const existingOrders = await getOrdersWithCommentIds([printedList[0].comment_id]);
-            let orderToUpdate = null;
+            // Extract date range from startTime and endTime (CommiLive style)
+            const startDate = new Date(startTime).toISOString().split('T')[0]; // YYYY-MM-DD
+            const endDate = new Date(endTime).toISOString().split('T')[0]; // YYYY-MM-DD
 
-            for (const order of existingOrders) {
-                if (order.customer_username === username) {
-                    const isFullyInRange = await checkOrderFullyInRange(order.id, startTime, endTime);
-                    if (isFullyInRange) {
-                        orderToUpdate = order;
-                        break;
+            // Check if there's an order that should be updated
+            // Priority 1: Find by live_date range (CommiLive style)
+            let orderToUpdate = await findOrderByLiveDateRange(username, startDate, endDate);
+
+            // Priority 2: Fallback to comment_id check (current system logic)
+            if (!orderToUpdate) {
+                const existingOrders = await getOrdersWithCommentIds([printedList[0].comment_id]);
+                for (const order of existingOrders) {
+                    if (order.customer_username === username) {
+                        const isFullyInRange = await checkOrderFullyInRange(order.id, startTime, endTime);
+                        if (isFullyInRange) {
+                            // Get full order object
+                            orderToUpdate = await getOrderById(order.id);
+                            break;
+                        }
                     }
                 }
+            } else {
+                // Get full order object if found by live_date range
+                orderToUpdate = await getOrderById(orderToUpdate.id);
             }
 
             if (orderToUpdate) {
-                // Update existing order
+                // Update existing order (with duplicate check)
                 const result = await addItemsToOrder(orderToUpdate.id, items);
                 updated.push({
                     orderId: orderToUpdate.id,
                     username,
                     itemsAdded: result.itemsCount,
+                    appended: result.itemsCount, // CommiLive style
+                    skipped: result.skipped || 0,
                     oldTotal: result.oldTotal,
-                    newTotal: result.newTotal
+                    newTotal: result.newTotal,
+                    existing: true
                 });
             } else {
                 // Create new order
@@ -263,7 +279,8 @@ const createFromPrinted = async (req, res) => {
                     username,
                     itemsAdded: result.itemsCount,
                     total: result.order.total_amount,
-                    liveDate
+                    liveDate,
+                    existing: false
                 });
             }
         }

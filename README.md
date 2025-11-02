@@ -336,7 +336,8 @@ Backend service for employee attendance tracking with GPS validation.
             "username": "user123",
             "itemsAdded": 5,
             "total": 500000,
-            "liveDate": "2023-10-21"
+            "liveDate": "2023-10-21",
+            "existing": false
           }
         ],
         "updated": [
@@ -344,8 +345,11 @@ Backend service for employee attendance tracking with GPS validation.
             "orderId": 1435,
             "username": "kiwiditinana",
             "itemsAdded": 3,
+            "appended": 3,
+            "skipped": 0,
             "oldTotal": 200000,
-            "newTotal": 350000
+            "newTotal": 350000,
+            "existing": true
           }
         ],
         "summary": {
@@ -369,10 +373,17 @@ Backend service for employee attendance tracking with GPS validation.
     }
     ```
   - **Logic**:
+    - Lọc `print_type`: Chỉ lấy `'comment'` hoặc `NULL`, bỏ qua `'backup'` và `'backup_notification'`
     - Parse giá từ `comment_text` trong `printed_history` (ví dụ: "200" → 200000đ, "t150" → 150000đ)
     - Nhóm printed theo `username`
-    - Nếu 1 đơn hàng có TẤT CẢ printed nằm trong khoảng thời gian → cập nhật (thêm printed mới vào)
-    - Nếu không → tạo đơn hàng mới
+    - Tìm đơn hàng tồn tại:
+      - Ưu tiên 1: Tìm theo `live_date` trong khoảng [startDate, endDate] (CommiLive style)
+      - Ưu tiên 2: Tìm theo `comment_id` và kiểm tra tất cả items có trong range
+    - Nếu đơn hàng tồn tại: 
+      - So sánh items mới với items hiện tại (trim, exact match, case-insensitive)
+      - Chỉ append items chưa có (tránh trùng lặp)
+      - Trả về `existing: true`, `appended: số items mới`
+    - Nếu không có đơn hàng tồn tại → tạo đơn hàng mới
     - `live_date` = ngày của printed đầu tiên (YYYY-MM-DD, không có giờ)
     - `status` mặc định = "chua_rep"
     - Ngăn chặn chia cắt printed: nếu khoảng thời gian chỉ chứa 1 nửa printed → trả lỗi 400
